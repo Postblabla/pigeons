@@ -1,0 +1,4 @@
+comtypes
+pywin32
+pillow
+python-docx
