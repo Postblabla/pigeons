@@ -17,6 +17,11 @@ panel. Everything stays on your computer.
   buttons (*Open the folder*, *Bring to front*); per-session turn duration and context size.
 - **Coordinates AIs**: a live registry (`activite.json`) of who works where, `annonce.py` for other AIs to announce
   themselves and ask whether a file is free, and a warning when two AIs write the same file.
+- **Plugs into each AI's own tools**: an MCP server (`pigeons_mcp.py`, no dependency) gives Claude Code, Codex,
+  Antigravity and the Claude app the same tools (show, list, who works, announce, end); Claude Code hooks remind every
+  session of the pigeons, ask you before a session overwrites a file another AI just wrote, and send a session back
+  when it asks you for a click without showing it. Codex and Antigravity are followed by reading their local
+  conversation databases (read-only).
 - **Settings in the style of modern apps**: themes (system, light, dark, night, amber), your own colors, contrast,
   line shape and motion, frames, and a search box. English and French.
 

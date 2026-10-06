@@ -1,6 +1,6 @@
 # Pigeons: the manual
 
-*The guidance system for working with AI sessions · version of 2026-10-05*
+*The guidance system for working with AI sessions · version of 2026-10-06*
 
 ## 1. Who this manual is for
 
@@ -55,6 +55,7 @@ To do for you: one card per session waiting for you, the most important first. W
 - Later: 5 min, 15 min, 1 h or no limit.
 - End: the session is finished; it comes back if you write to it.
 - Copy, Open, Show: the links and files the session mentioned.
+- New session: when the session gives a prompt to paste into a fresh session, this button copies it and opens a new session in the right folder of the Claude app. Then paste (Ctrl+V) and send.
 - Active help: when a session asks you to go into a folder, open a file or a window, its card offers “Open the folder”, “Open the file” or “Bring to front”.
 - Working: “Folder” opens the place where the session works; the row shows how long its turn has lasted and its context size (a compaction comes near the limit); a warning if two sessions work in the same folder.
 
@@ -82,6 +83,8 @@ A session that needs an action runs: python montre.py --texte "Click Accept" --f
 Other targets: --fichier, --point X Y. A drag: --vers-… Two steps: --puis-… Also --importance, --fin, --termine. Another AI: --session name --titre "Name".
 
 Coordination: the pigeons keep activite.json up to date (who works where, every 2 s). Another AI announces itself with annonce.py --session name --fichier PATH --ecrit, and asks before writing: annonce.py --qui PATH (free, occupied). The panel warns when two AIs write the same file.
+
+The MCP server (pigeons_mcp.py): the same tools in each AI's own tool list (show, list, clear, end, who_works, announce, state), with no command line to remember. Claude Code, Codex, Antigravity and the Claude app (as “pigeons-cowork”) can plug it in. A Claude Code hook reminds every session of the pigeons at start, and another asks you before a session writes a file another AI wrote < 5 min ago.
 
 #### Settings
 
@@ -288,7 +291,7 @@ So that two AIs don't write the same file at the same time (the user, October 3,
 
 ## 6. How it works inside
 
-Everything is in `preuve_pigeons.py` (about 5300 lines), in three parts that talk through a shared state.
+Everything is in `preuve_pigeons.py` (about 5600 lines), in three parts that talk through a shared state.
 
 #### The watcher (Guetteur class, its own thread, one round per second)
 

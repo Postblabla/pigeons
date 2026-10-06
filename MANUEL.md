@@ -1,6 +1,6 @@
 # Pigeons : le manuel
 
-*Le système d'indication pour travailler avec des sessions d'IA · version du 2026-10-05*
+*Le système d'indication pour travailler avec des sessions d'IA · version du 2026-10-06*
 
 ## 1. À qui s'adresse ce manuel
 
@@ -55,6 +55,7 @@ Ces couleurs se changent dans Réglages.
 - Plus tard : 5 min, 15 min, 1 h ou sans limite.
 - Terminer : la session est finie ; elle revient si tu lui écris.
 - Copier, Ouvrir, Montrer : les liens et les fichiers cités par la session.
+- Nouvelle séance : quand la session donne un prompt à coller dans une séance neuve, ce bouton le copie et ouvre une nouvelle session dans le bon dossier de l'app Claude. Il reste à coller (Ctrl+V) et à envoyer.
 - Aide active : quand une session te demande d'aller dans un dossier, d'ouvrir un fichier ou une fenêtre, sa carte offre « Ouvrir le dossier », « Ouvrir le fichier » ou « Amener devant ».
 - Au travail : « Dossier » ouvre l'endroit où la session travaille ; la ligne dit depuis quand dure son tour et la taille de son contexte (une compaction vient près de la limite) ; un avertissement si deux sessions travaillent dans le même dossier.
 
@@ -82,6 +83,8 @@ Une session qui a besoin d'un geste lance : python montre.py --texte "Clique sur
 Autres cibles : --fichier, --point X Y. Un glisser : --vers-… Deux étapes : --puis-… Et aussi --importance, --fin, --termine. Une autre IA : --session nom --titre "Nom".
 
 La coordination : les pigeons tiennent activite.json à jour (qui travaille où, toutes les 2 s). Une autre IA s'annonce par annonce.py --session nom --fichier CHEMIN --ecrit, et demande avant d'écrire : annonce.py --qui CHEMIN (libre, occupé). Le panneau avertit quand deux IA écrivent le même fichier.
+
+Le serveur MCP (pigeons_mcp.py) : les mêmes outils dans la liste d'outils de chaque IA (montrer, lister, effacer, terminer, qui_travaille, annoncer, etat), sans ligne de commande à retenir. Branché dans Claude Code, Codex, Antigravity et l'app Claude (sous le nom « pigeons-cowork »). Un crochet de Claude Code rappelle les pigeons à chaque session qui s'ouvre ; un autre te demande ton accord avant qu'une session écrive un fichier qu'une autre IA a écrit il y a moins de 5 min.
 
 #### Les réglages
 
@@ -288,7 +291,7 @@ Pour que deux IA n'écrivent pas le même fichier en même temps (l'utilisateur,
 
 ## 6. Comment ça marche dedans
 
-Tout tient dans `preuve_pigeons.py` (environ 5300 lignes), en trois parties qui se parlent par un état partagé.
+Tout tient dans `preuve_pigeons.py` (environ 5600 lignes), en trois parties qui se parlent par un état partagé.
 
 #### Le guetteur (classe Guetteur, un fil à part, un tour par seconde)
 

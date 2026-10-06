@@ -8,6 +8,7 @@ signaux/
 fermetures/
 annonces/
 preuve_pigeons.log*
+mcp.log
 cle_*
 __pycache__/
 *.tmp

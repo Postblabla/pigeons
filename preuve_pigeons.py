@@ -235,6 +235,15 @@ ANGLAIS = {
     "Dans 5 min": "In 5 min", "Dans 15 min": "In 15 min", "Dans 1 h": "In 1 h", "Sans limite": "No limit",
     "lien": "link", "dossier": "folder", "fichier": "file", "Montrer": "Show", "Ouvrir": "Open", "Copier": "Copy",
     "texte": "text", "Oublier": "Dismiss", "Livrables des sessions finies": "Deliverables of finished sessions",
+    "nouvelle séance": "new session", "Nouvelle séance": "New session",
+    "« {e} » introuvable": "« {e} » not found", "introuvable": "not found", "proche : « {n} »": "close: « {n} »",
+    "pas sur cette page": "not on this page", "{ia} a fini son tour : à toi de jouer": "{ia} finished its turn: your move",
+    "attend": "waiting",
+    "Copie l'invite et ouvre une nouvelle session dans son dossier, dans l'app Claude : il reste à coller (Ctrl+V).":
+        "Copies the prompt and opens a new session in its folder, in the Claude app: then paste (Ctrl+V).",
+    "Clique « Nouveau », choisis le dossier « {d} », puis colle l'invite (Ctrl+V)":
+        "Click « New », pick the folder « {d} », then paste the prompt (Ctrl+V)",
+    "Clique « Nouveau », puis colle l'invite (Ctrl+V)": "Click « New », then paste the prompt (Ctrl+V)",
     "Copie le texte du bloc (un prompt, une commande).": "Copies the block's text (a prompt, a command).",
     "Ces livrables s'en vont du panneau (la session reste terminée).": "These deliverables leave the panel (the session stays finished).",
     "terminée ": "finished ",
@@ -486,6 +495,8 @@ def contenu_guide():
                 "• Done: the requested action is done.   • Later: 5 min, 15 min, 1 h or no limit.",
                 "• End: the session is finished; it comes back if you write to it.",
                 "• Copy, Open, Show: the links and files the session mentioned.",
+                "• New session: when the session gives a prompt to paste into a fresh session, this button copies it "
+                "and opens a new session in the right folder of the Claude app. Then paste (Ctrl+V) and send.",
                 "• Active help: when a session asks you to go into a folder, open a file or a window, its card offers "
                 "“Open the folder”, “Open the file” or “Bring to front”.",
                 "• Working: “Folder” opens the place where the session works; the row shows how long its turn has "
@@ -510,7 +521,11 @@ def contenu_guide():
                 "--termine. Another AI: --session name --titre \"Name\".",
                 "Coordination: the pigeons keep activite.json up to date (who works where, every 2 s). Another AI "
                 "announces itself with annonce.py --session name --fichier PATH --ecrit, and asks before writing: "
-                "annonce.py --qui PATH (free, occupied). The panel warns when two AIs write the same file."]},
+                "annonce.py --qui PATH (free, occupied). The panel warns when two AIs write the same file.",
+                "The MCP server (pigeons_mcp.py): the same tools in each AI's own tool list (show, list, clear, end, "
+                "who_works, announce, state), with no command line to remember. Claude Code, Codex, Antigravity and "
+                "the Claude app (as “pigeons-cowork”) can plug it in. A Claude Code hook reminds every session of the "
+                "pigeons at start, and another asks you before a session writes a file another AI wrote < 5 min ago."]},
             {"titre": "Settings", "texte": [
                 "At the bottom of the panel: guidance (lines or arrows), on-screen info, line shape and motion, fade, "
                 "frames, pigeons, colors, language. Everything is kept in reglages.json.",
@@ -549,6 +564,8 @@ def contenu_guide():
             "• C'est fait : le geste demandé est fait.   • Plus tard : 5 min, 15 min, 1 h ou sans limite.",
             "• Terminer : la session est finie ; elle revient si tu lui écris.",
             "• Copier, Ouvrir, Montrer : les liens et les fichiers cités par la session.",
+            "• Nouvelle séance : quand la session donne un prompt à coller dans une séance neuve, ce bouton le copie et "
+            "ouvre une nouvelle session dans le bon dossier de l'app Claude. Il reste à coller (Ctrl+V) et à envoyer.",
             "• Aide active : quand une session te demande d'aller dans un dossier, d'ouvrir un fichier ou une fenêtre, "
             "sa carte offre « Ouvrir le dossier », « Ouvrir le fichier » ou « Amener devant ».",
             "• Au travail : « Dossier » ouvre l'endroit où la session travaille ; la ligne dit depuis quand dure son tour "
@@ -574,7 +591,12 @@ def contenu_guide():
             "--importance, --fin, --termine. Une autre IA : --session nom --titre \"Nom\".",
             "La coordination : les pigeons tiennent activite.json à jour (qui travaille où, toutes les 2 s). Une autre "
             "IA s'annonce par annonce.py --session nom --fichier CHEMIN --ecrit, et demande avant d'écrire : "
-            "annonce.py --qui CHEMIN (libre, occupé). Le panneau avertit quand deux IA écrivent le même fichier."]},
+            "annonce.py --qui CHEMIN (libre, occupé). Le panneau avertit quand deux IA écrivent le même fichier.",
+            "Le serveur MCP (pigeons_mcp.py) : les mêmes outils dans la liste d'outils de chaque IA (montrer, lister, "
+            "effacer, terminer, qui_travaille, annoncer, etat), sans ligne de commande à retenir. Branché dans Claude "
+            "Code, Codex, Antigravity et l'app Claude (sous le nom « pigeons-cowork »). Un crochet de Claude Code "
+            "rappelle les pigeons à chaque session qui s'ouvre ; un autre te demande ton accord avant qu'une session "
+            "écrive un fichier qu'une autre IA a écrit il y a moins de 5 min."]},
         {"titre": "Les réglages", "texte": [
             "En bas du panneau : le guidage (lignes ou flèches), les infos à l'écran, la forme et le mouvement des "
             "lignes, le fondu, les encadrés, les pigeons, les couleurs, la langue. Tout se garde dans reglages.json.",
@@ -852,6 +874,27 @@ def chemin_touche(outil, entree, dossier_courant):
 RE_LIEN_MD = re.compile(r"\[([^\]\n]{1,80})\]\(([^)\s]+)\)")
 RE_URL = re.compile(r"https?://[^\s)>\]\"'`]+")
 RE_BLOC = re.compile(r"^[ \t]*```[^\n`]*\n(.*?)\n[ \t]*```", re.S | re.M)   # un bloc de code Markdown, son contenu seul
+# Une invite à coller dans une nouvelle séance (6 octobre 2026) : le prompt de reprise d'un projet.
+RE_INVITE = re.compile(r"PROMPT_PROCHAINE_SESSION|\bLis en entier\b|^Ma mission\s*:", re.I | re.M)
+RE_SEANCE_DANS = re.compile(r"(?:séance|session)\s+(?:neuve\s+|fraîche\s+|nouvelle\s+)?dans\s+(?:`([^`\n]{3,80})`|([^\s`,;]+))",
+                            re.I)
+
+
+def dossier_de_l_invite(bloc, texte):
+    """Le dossier où ouvrir la séance d'une invite : celui du premier fichier qu'elle cite (« Lis en entier
+    C:\\...\\Mon projet\\PROMPT_PROCHAINE_SESSION.txt » : Mon projet), sinon « séance dans `Desktop\\X` » dans la
+    réponse (relatif au dossier de l'utilisateur). None si on ne sait pas."""
+    for m in RE_CHEMIN.finditer(bloc):
+        c = plus_long_existant(m.group(0))
+        if c:
+            return c if os.path.isdir(c) else os.path.dirname(c)
+    m = RE_SEANCE_DANS.search(texte or "")
+    if m:
+        brut = (m.group(1) or m.group(2)).strip().rstrip(".:").replace("/", os.sep)
+        for c in (brut, os.path.join(str(Path.home()), brut), os.path.join(str(Path.home() / "Desktop"), brut)):
+            if os.path.isabs(c) and os.path.isdir(c):
+                return os.path.normpath(c)
+    return None
 
 
 def sorties_de(texte, dossier):
@@ -865,17 +908,22 @@ def sorties_de(texte, dossier):
     from urllib.parse import unquote, urlparse
     items, vus = [], set()
 
-    def ajouter(genre, valeur, nom):
+    def ajouter(genre, valeur, nom, **plus):
         cle = valeur.casefold()
         if cle not in vus and len(items) < 8:
             vus.add(cle)
-            items.append({"genre": genre, "valeur": valeur, "nom": nom})
+            items.append({"genre": genre, "valeur": valeur, "nom": nom, **plus})
 
     for bloc in RE_BLOC.findall(texte or "")[:3]:
         bloc = bloc.strip("\r\n")
         if len(bloc.strip()) >= 20:                 # un mot seul ne vaut pas un bouton
             premiere = next((l.strip() for l in bloc.splitlines() if l.strip()), "")
-            ajouter("texte", bloc, premiere)
+            if RE_INVITE.search(bloc):
+                # Une invite de séance (l'utilisateur, 6 octobre 2026 : « ouvre une séance dans X et colle le prompt », le
+                # geste le plus fréquent, n'était jamais montré) : Copier, et « Nouvelle séance ».
+                ajouter("invite", bloc, premiere, dossier=dossier_de_l_invite(bloc, texte))
+            else:
+                ajouter("texte", bloc, premiere)
 
     for nom, cible in RE_LIEN_MD.findall(texte or ""):
         if cible.startswith(("http://", "https://")):
@@ -897,6 +945,83 @@ def sorties_de(texte, dossier):
         if c and len(c) > 12:
             ajouter("fichier", c, os.path.basename(c) or c)
     return items
+
+
+# Codex et Antigravity (AG) suivis seuls (6 octobre 2026) : les bases où chacun range ses conversations, lues en
+# lecture seule. Vérifié ce jour-là : AG, conversation_summaries (title, status CASCADE_RUN_STATUS_IDLE quand il a
+# fini, last_modified_time, last_user_input_time) ; Codex, threads (title, cwd, updated_at_ms, archived, source).
+BASE_AG = Path.home() / ".gemini" / "antigravity" / "conversation_summaries.db"
+BASE_CODEX = Path.home() / ".codex" / "state_5.sqlite"
+SUIVI_S = 30 * 60           # une conversation touchée depuis moins de 30 min : suivie
+CODEX_FINI_S = 90           # un fil de Codex immobile depuis 90 s : il a fini son tour
+
+
+def lire_base(chemin, requete):
+    """Les lignes d'une base SQLite d'une autre IA, en lecture seule ; [] si elle dort depuis 30 min (on ne l'ouvre
+    même pas) ou si elle est occupée."""
+    import sqlite3
+    try:
+        touchee = max(p.stat().st_mtime for p in (chemin, chemin.with_name(chemin.name + "-wal")) if p.exists())
+    except ValueError:
+        return []
+    if time.time() - touchee > SUIVI_S:
+        return []
+    c = sqlite3.connect(f"file:{chemin.as_posix()}?mode=ro", uri=True, timeout=0.5)
+    try:
+        return c.execute(requete).fetchall()
+    finally:
+        c.close()
+
+
+def heure_iso(t):
+    """« 2026-10-04 03:33:02.3094983+00:00 » (7 décimales, qu'ISO n'accepte pas) en secondes."""
+    return datetime.fromisoformat(re.sub(r"(\.\d{6})\d+", r"\1", str(t).replace(" ", "T"))).timestamp()
+
+
+def conversations_ag(maintenant):
+    """Les conversations d'AG vivantes : au travail, ou qui ont répondu après la dernière question de l'utilisateur."""
+    from urllib.parse import unquote
+    vues = []
+    for cid, titre, statut, pas_fini, modif, entree, espaces, prof in lire_base(BASE_AG, (
+            "select conversation_id, title, status, not_fully_idle, last_modified_time, last_user_input_time, "
+            "workspace_uris, nesting_depth from conversation_summaries order by last_modified_time desc limit 5")):
+        try:
+            m, u = heure_iso(modif), (heure_iso(entree) if entree else 0)
+        except ValueError:
+            continue
+        if prof or maintenant - m > SUIVI_S:
+            continue
+        travaille = ("IDLE" not in (statut or "")) or bool(pas_fini)
+        if travaille and maintenant - m > 600:
+            travaille = False                     # un état « en cours » resté collé
+        uri = re.search(r"file:///([^\s\"',\]]+)", espaces or "")
+        dossier = os.path.normpath(unquote(uri.group(1))) if uri else None
+        v = {"session": f"ag-{cid[:8]}", "titre": f"AG · {court(titre or 'conversation', 40)}", "ia": "Antigravity",
+             "app": "Antigravity", "dossier": dossier if dossier and os.path.isdir(dossier) else None, "heure": m}
+        if not travaille:
+            if m < u + 2:
+                continue                          # c'est l'utilisateur qui a écrit en dernier : AG va travailler
+            v["attend"] = m
+        vues.append(v)
+    return vues
+
+
+def fils_codex(maintenant):
+    """Les fils de Codex vivants (pas les sous-agents ni les archivés) : au travail, ou fini depuis 90 s."""
+    vues = []
+    for tid, titre, cwd, maj_ms, maj, archive, source in lire_base(BASE_CODEX, (
+            "select id, title, cwd, updated_at_ms, updated_at, archived, source from threads "
+            "order by coalesce(updated_at_ms, updated_at * 1000) desc limit 5")):
+        m = (maj_ms or 0) / 1000 or float(maj or 0)
+        if archive or str(source or "").startswith("{") or maintenant - m > SUIVI_S:
+            continue
+        dossier = re.sub(r"^\\\\\?\\", "", cwd or "")
+        v = {"session": f"codex-{str(tid)[-8:]}", "titre": f"Codex · {court(titre or 'fil', 40)}", "ia": "Codex",
+             "app": "Codex", "dossier": dossier if os.path.isdir(dossier) else None, "heure": m}
+        if maintenant - m > CODEX_FINI_S:
+            v["attend"] = m
+        vues.append(v)
+    return vues
 
 
 def court(texte, n=160):
@@ -1090,6 +1215,8 @@ class Guetteur(threading.Thread):
         self.conflits = []               # [(fichier, [titres])] : deux IA qui écrivent le même fichier (le panneau)
         self.livrables = []              # les livrables des sessions qui se sont terminées elles-mêmes (le panneau)
         self.t_activite = 0.0
+        self.t_suivi = 0.0               # le suivi de Codex et d'AG (suivre_les_autres_ia), toutes les 5 s
+        self.suivis = {}                 # session -> l'annonce écrite pour elle la dernière fois
         self.tours = 0
         self.battement = time.time()     # la fin du dernier tour : l'affichage s'en sert pour voir s'il est figé
         self.actif = True                # faux quand l'affichage l'a remplacé par un autre guetteur
@@ -1270,11 +1397,60 @@ class Guetteur(threading.Thread):
                 self.donner_couleur(s)
                 self.sessions[ident] = s
             s.annonce = d
+            s.titre = d.get("titre") or s.titre
             s.chemin = d.get("fichier") or d.get("dossier")
             s.dernier_geste = max(s.dernier_geste, d.get("heure", 0))
             s.outil = tr("écrit") if d.get("ecrit") else tr("travaille")
             if d.get("ecrit") and d.get("fichier") and (d["fichier"], d["heure"]) not in s.ecrits:
                 s.ecrits.append((d["fichier"], d["heure"]))
+            if d.get("attend"):
+                # Codex ou AG a fini son tour (suivre_les_autres_ia) : sa carte « t'attend », sans ligne (basse).
+                s.attend_depuis = d["attend"]
+                s.importance = "basse"
+                s.texte_attente = tr("{ia} a fini son tour : à toi de jouer", ia=d.get("ia") or ident)
+                s.outil = tr("attend")
+            else:
+                s.attend_depuis = None
+
+    def suivre_les_autres_ia(self, maintenant):
+        """Codex et Antigravity (AG) suivis seuls, sans qu'ils appellent rien (l'utilisateur, 6 octobre 2026 : « des oublis
+        d'utiliser l'app »). Toutes les 5 s, on lit en lecture seule la base où chacun range ses conversations, et on
+        écrit pour eux une annonce (comme annonce.py) : au travail, ou « a fini son tour » (sa carte t'attend 30 min).
+        Une IA qui s'annonce elle-même (le serveur MCP, annonce.py) passe avant : on ne réécrit pas son annonce."""
+        if maintenant - self.t_suivi < 5:
+            return
+        self.t_suivi = maintenant
+        try:
+            vues = conversations_ag(maintenant) + fils_codex(maintenant)
+        except Exception as ex:                  # une base illisible ne doit jamais arrêter le guetteur
+            log.warning("suivi de Codex et d'AG : %s", ex)
+            return
+        ANNONCES.mkdir(exist_ok=True)
+        for v in vues:
+            f = ANNONCES / f"{v['session']}.json"
+            propre = None
+            for g in ANNONCES.glob("*.json"):
+                try:
+                    a = json.loads(g.read_text(encoding="utf-8"))
+                except (ValueError, OSError):
+                    continue
+                if a.get("ia") == v["ia"] and not a.get("par_suivi") and maintenant - a.get("heure", 0) < 600:
+                    propre = a                       # elle s'annonce déjà elle-même
+            if propre:
+                continue
+            annonce = {"session": v["session"], "titre": v["titre"], "ia": v["ia"], "app": v["app"],
+                       "fichier": None, "dossier": v.get("dossier"), "ecrit": False, "par_suivi": True,
+                       "heure": v["heure"], "duree_s": 600 if not v.get("attend") else 1800,
+                       **({"attend": v["attend"]} if v.get("attend") else {})}
+            if self.suivis.get(v["session"]) == annonce:
+                continue                             # rien de neuf : on n'écrit pas
+            self.suivis[v["session"]] = annonce
+            try:
+                provisoire = f.with_suffix(".tmp")
+                provisoire.write_text(json.dumps(annonce, ensure_ascii=False), encoding="utf-8")
+                os.replace(provisoire, f)
+            except OSError as ex:
+                log.warning("annonce de %s : %s", v["session"], ex)
 
     def calculer_conflits(self, maintenant):
         """Deux sessions ou IA qui ont écrit le même fichier à moins de 5 min : un conflit possible. Les écritures
@@ -1879,6 +2055,14 @@ class Guetteur(threading.Thread):
                 raison += tr(" ; les noms proches : {n}", n=", ".join(f"« {x} »" for x in ou["proches"]))
             elif not onglet and nom_de_classe(hwnd) == "Chrome_WidgetWin_1":
                 raison += tr(" ; si c'est dans un autre onglet, donne --onglet")
+            # La balise « introuvable » (démo du 6 octobre 2026, 08h29 : l'onglet ChatGPT montrait la page des forfaits,
+            # sans « Nouveau chat », et la balise s'effaçait sans rien dire) : elle se pose en haut de la page de la
+            # fenêtre et dit ce qui manque, avec les noms proches.
+            if not user32.IsIconic(W.HWND(hwnd)):
+                vue = self.zone_de_page(hwnd) or cadre_visible(hwnd)
+                if vue:
+                    ou["ancre"] = ((vue[0] + vue[2]) // 2, vue[1] + 70)
+                    ou["introuvable"] = court(element or "", 30)
             return None, raison, None, ou
         nom = info.get("nom") or element or ""
         if nom:
@@ -1988,6 +2172,7 @@ class Guetteur(threading.Thread):
             return {**etat, "mode": "montre", "importance": importance, "cible": a, "vers": b, "zone": za, "zone_vers": zb,
                     "puis": c2, "zone_puis": z2, "texte_puis": s.demande.get("texte_puis") or "",
                     "trouvee": a is not None, "precision": precision, "ou": oa, "ou_vers": ob, "ou_puis": o2,
+                    "ancre": (oa or {}).get("ancre") if a is None else None,
                     "depuis": s.demande.get("heure", 0),
                     "bulle": texte + (f"\n({precision})" if precision else ""), "libelle": tr("te montre : ") + court(texte, 60)}
         # Une permission à donner (le crochet Notification) : la session est arrêtée tant que l'utilisateur n'a rien fait.
@@ -2098,6 +2283,7 @@ class Guetteur(threading.Thread):
             if vieux > limite or s.fini:
                 del self.sessions[cle]          # le pigeon s'envole pour de bon
         self.lire_demandes(maintenant)
+        self.suivre_les_autres_ia(maintenant)
         self.lire_annonces(maintenant)
         self.lire_signaux(maintenant)
         self.lire_fiches_app(maintenant)
@@ -3633,7 +3819,11 @@ class Panneau:
         tk = self.tk
         l = tk.Frame(parent, bg=self.CARTE)
         l.pack(fill="x", pady=(2, 0))
-        if item["genre"] == "texte":
+        if item["genre"] == "invite":
+            dossier = item.get("dossier")
+            item = {**item, "nom": os.path.basename(dossier.rstrip("\\/")) if dossier else item["nom"]}
+            icone = tr("nouvelle séance")
+        elif item["genre"] == "texte":
             icone = tr("texte")
         else:
             icone = tr("lien" if item["genre"] == "lien" else ("dossier" if os.path.isdir(item["valeur"]) else "fichier"))
@@ -3656,6 +3846,11 @@ class Panneau:
             import subprocess
             subprocess.Popen(["explorer", "/select,", valeur])
 
+        if item["genre"] == "invite":
+            self.bouton(l, "Nouvelle séance", lambda it=item: self.v.nouvelle_seance(it), petit=True, cote="right",
+                        aide="Copie l'invite et ouvre une nouvelle session dans son dossier, dans l'app Claude : il reste à coller (Ctrl+V).")
+            self.bouton(l, "Copier", copier, petit=True, cote="right", aide="Copie le texte du bloc (un prompt, une commande).")
+            return
         if item["genre"] == "texte":
             self.bouton(l, "Copier", copier, petit=True, cote="right", aide="Copie le texte du bloc (un prompt, une commande).")
             return
@@ -3959,12 +4154,18 @@ class Volee:
         for e in etats_eff:
             if e["eff"] != "montre" or not e["cible"] or e.get("provisoire"):
                 continue
+            ou = (e.get("ou_puis") if e.get("etape") == 2 else e.get("ou")) or {}
             if appuye and dans_zone(cx, cy, e.get("zone"), e["cible"]):
                 if e["vers"]:
                     self.appui_sur_a.add(e["ident"])
                 elif e.get("etape") == 1:
                     self.etapes[e["ident"]] = 2         # l'étape 1 est faite : on guide vers l'étape 2
                     log.info("étape 1 faite pour %s", e["ident"])
+                elif ou.get("etape1"):
+                    # Une étape d'avant (la fenêtre réduite ou derrière, l'onglet caché, l'icône couverte) : ce clic
+                    # n'est pas le geste demandé. Le guetteur resitue la cible au tour suivant et guide vers la vraie
+                    # (démo du 6 octobre 2026, 08h18 : le clic sur Chrome dans la barre des tâches fermait la demande).
+                    log.info("étape d'avant faite pour %s : %s", e["ident"], ou["etape1"])
                 else:
                     self.fini(e["ident"])
             elif not appuye and e["ident"] in self.appui_sur_a and dans_zone(cx, cy, e.get("zone_vers"), e["vers"], 50):
@@ -4325,6 +4526,19 @@ class Volee:
         l'écran quand ce n'est pas celui de la souris."""
         complet = self.reglages["balise_detail"] == "complet"
         morceaux, puces = [], []
+        if ou.get("introuvable") is not None and not e.get("cible"):
+            # La cible manque dans sa fenêtre : la balise le dit, et propose les noms proches.
+            if ou.get("app"):
+                morceaux.append((ou.get("exe"), ou["app"], False))
+            if ou.get("lieu"):
+                morceaux.append((None, ou["lieu"], False))
+            morceaux.append((None if morceaux else ou.get("exe"),
+                             tr("« {e} » introuvable", e=ou["introuvable"]) if ou["introuvable"] else tr("introuvable"), True))
+            for nom in (ou.get("proches") or [])[:2]:
+                puces.append((None, tr("proche : « {n} »", n=court(nom, 24)), "info"))
+            if not ou.get("proches"):
+                puces.append((None, tr("pas sur cette page"), "alerte"))
+            return tuple(morceaux), tuple(puces), None
         if ou.get("etape1"):
             morceaux.append((ou.get("exe"), ou["etape1"], True))
             obstacle = ou.get("obstacle") or {}
@@ -4353,9 +4567,17 @@ class Volee:
         exactement la cible (l'app, l'onglet, l'élément, ce qui la couvre). Une deuxième balise sur le lien vers
         l'étape 2 (ou le point de dépose d'un glisser). Une balise qui n'a pas de place sur sa ligne s'efface : la
         souris est déjà tout près de la cible."""
-        rg, voulues = self.reglages, {}
+        rg, voulues, sur_ancre = self.reglages, {}, set()
         if rg["balise"]:
             for e in etats:
+                if e.get("eff") == "montre" and not e.get("cible") and e.get("ancre"):
+                    # La cible est introuvable dans sa fenêtre : une balise en haut de la page, sans ligne.
+                    ancre = tuple(e["ancre"])
+                    voulues[(e["ident"], "a")] = (self.contenu_balise(e, e.get("ou") or {}, None),
+                                                  rvb(self.couleur_guide(e)), (cx, cy), ancre,
+                                                  zone_ou_carre(None, ancre, 12), [], maintenant)
+                    sur_ancre.add((e["ident"], "a"))
+                    continue
                 if e.get("eff") != "montre" or not e.get("cible"):
                     continue
                 couleur = rvb(self.couleur_guide(e))
@@ -4385,12 +4607,15 @@ class Volee:
             b.peindre(contenu, couleur, fond, texte)
             lg, ht = b.taille()
             centre = place_sur_ligne(lg, ht, de, a, zone, list(eviter) + poses, self.ecrans)
+            if centre is None and cle in sur_ancre:
+                centre = a                             # la souris est déjà sur la page : la balise se pose là
             if centre is None:
                 b.partir(maintenant)
                 continue
             long = math.hypot(a[0] - de[0], a[1] - de[1]) or 1
             b.poser(centre, ((a[0] - de[0]) / long, (a[1] - de[1]) / long), maintenant,
-                    self.lignes_nees_de(a, depuis), bouge, zone if cle[1] == "a" else None, couleur, rg["balise_respire"])
+                    self.lignes_nees_de(a, depuis), bouge, zone if cle[1] == "a" and cle not in sur_ancre else None,
+                    couleur, rg["balise_respire"])
             r = b.rect()
             if r:
                 self.trous.append(r)
@@ -4700,6 +4925,11 @@ class Volee:
         (Invoke, Select, l'action par défaut) sur la ligne et ses parents ; sinon, un clic au centre de la ligne,
         et la souris revient où elle était."""
         e = self.etats.get(ident)
+        s = self.guetteur.sessions.get(ident) if getattr(self, "guetteur", None) else None
+        app = (getattr(s, "annonce", None) or {}).get("app")
+        if app:
+            self.amener_fenetre(app)                  # Codex ou AG (suivre_les_autres_ia) : leur fenêtre devant
+            return
         h = user32.FindWindowW("Chrome_WidgetWin_1", "Claude")
         if not e or not h:
             return
@@ -4725,6 +4955,65 @@ class Volee:
             log.info("aller à la session %s", e["titre"])
         except Exception as ex:
             log.warning("aller à la session : %s", ex)
+
+    def nouvelle_seance(self, item):
+        """« Nouvelle séance » (l'utilisateur, 6 octobre 2026 : le geste le plus fréquent, « ouvre une séance dans X et colle le
+        prompt », n'était jamais montré) : l'invite va dans le presse-papiers, l'app Claude vient devant et ouvre une
+        nouvelle session dans le bon dossier, par son bouton « Nouvelle session dans X. » de la liste de gauche (un par
+        dossier ; « la-marmite » pour Mon projet). Il reste à coller (Ctrl+V) et à envoyer : l'utilisateur garde l'envoi.
+        Sans ce bouton (barre latérale cachée, dossier jamais ouvert) : la ligne le guide vers « Nouveau »."""
+        import unicodedata
+
+        def norme(t):
+            t = unicodedata.normalize("NFD", (t or "").casefold())
+            return "".join(c for c in t if c.isalnum() and not unicodedata.combining(c))
+        self.racine.clipboard_clear()
+        self.racine.clipboard_append(item["valeur"])
+        self.infos["__copie__"] = time.time()
+        dossier = item.get("dossier")
+        nom = os.path.basename(dossier.rstrip("\\/")) if dossier else ""
+        h = user32.FindWindowW("Chrome_WidgetWin_1", "Claude")
+        if h:
+            amener_devant(h)
+            try:
+                uia, U = self.uia_principal()
+                cond = uia.CreateOrCondition(
+                    uia.CreatePropertyConditionEx(U.UIA_NamePropertyId, "Nouvelle session dans", 3),
+                    uia.CreatePropertyConditionEx(U.UIA_NamePropertyId, "New session in", 3))
+                tab = uia.ElementFromHandle(W.HWND(h)).FindAll(U.TreeScope_Descendants, cond)
+                groupes = {}
+                for k in range(tab.Length if nom else 0):
+                    el = tab.GetElement(k)
+                    groupe = re.sub(r"^(Nouvelle session dans|New session in)\s*", "", el.CurrentName or "").rstrip(". ")
+                    groupes.setdefault(norme(groupe), (groupe, el))
+                # Le dossier, sinon son parent le plus proche qui a son groupe (Pigeons n'en a pas : ses séances
+                # s'ouvrent dans « Desktop »).
+                d = dossier
+                for _ in range(3 if nom else 0):
+                    trouve = groupes.get(norme(os.path.basename(d.rstrip("\\/"))))
+                    if trouve:
+                        groupe, el = trouve
+                        if not activer_element(uia, U, el):
+                            z = el.CurrentBoundingRectangle
+                            cliquer((z.left + z.right) // 2, (z.top + z.bottom) // 2)
+                        log.info("nouvelle séance ouverte dans « %s »", groupe)
+                        return
+                    d = os.path.dirname(d.rstrip("\\/"))
+            except Exception as ex:
+                log.warning("nouvelle séance : %s", ex)
+        # Pas de bouton pour ce dossier : la ligne guide vers « Nouveau », et la consigne nomme le dossier.
+        demande = {"session": "nouvelle-seance", "titre": tr("Nouvelle séance"), "heure": time.time(), "duree_s": 300,
+                   "texte": tr("Clique « Nouveau », choisis le dossier « {d} », puis colle l'invite (Ctrl+V)", d=nom)
+                   if nom else tr("Clique « Nouveau », puis colle l'invite (Ctrl+V)"),
+                   "cible": {"fenetre": "Claude", "element": "Nouveau" if LANGUE == "fr" else "New"},
+                   "vers": None, "importance": "haute", "puis": None, "texte_puis": ""}
+        try:
+            provisoire = DEMANDES / "nouvelle-seance.tmp"
+            provisoire.write_text(json.dumps(demande, ensure_ascii=False), encoding="utf-8")
+            os.replace(provisoire, DEMANDES / "nouvelle-seance.json")
+        except OSError as ex:
+            log.warning("nouvelle séance (guidage) : %s", ex)
+        log.info("nouvelle séance : pas de bouton pour « %s », guidage vers Nouveau", nom)
 
     def amener_fenetre(self, titre):
         """« Amener devant » (l'aide active) : la première fenêtre visible dont le titre contient ce texte, hors des

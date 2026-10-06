@@ -17,6 +17,11 @@ ajoutent une carte au petit panneau « À faire pour toi ». Tout reste sur ton 
   aide active (Ouvrir le dossier, Amener devant) ; la durée du tour et la taille du contexte de chaque session.
 - **Coordonne les IA** : un registre en direct (`activite.json`) de qui travaille où, `annonce.py` pour qu'une autre
   IA s'annonce et demande si un fichier est libre, et une alerte quand deux IA écrivent le même fichier.
+- **Se branche dans les outils mêmes de chaque IA** : un serveur MCP (`pigeons_mcp.py`, sans dépendance) donne à
+  Claude Code, Codex, Antigravity et l'app Claude les mêmes outils (montrer, lister, qui travaille, annoncer,
+  terminer) ; des crochets de Claude Code rappellent les pigeons à chaque session, te demandent ton accord avant
+  qu'une session écrase un fichier qu'une autre IA vient d'écrire, et renvoient une session qui te demande un clic
+  sans le montrer. Codex et Antigravity sont suivis en lisant leurs bases de conversations locales (en lecture seule).
 - **Des réglages dans le style des applications modernes** : thèmes (système, clair, sombre, nuit, ambre), tes
   couleurs, le contraste, la forme et le mouvement des lignes, les encadrés, et une recherche. En français et en
   anglais.
