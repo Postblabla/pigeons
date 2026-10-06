@@ -45,6 +45,13 @@ FERMETURES = ICI / "fermetures"      # les sessions fermées (« Terminer », mo
 # pigeons écrivent pour toutes (qui travaille où).
 ANNONCES = ICI / "annonces"
 ACTIVITE = ICI / "activite.json"
+# La relance sûre (5 octobre 2026, 22h39 : l'affichage a gelé pendant la mise à jour de l'app Claude, Windows a fermé le
+# programme, et personne ne l'a su). « Arrêter » laisse ce mot : montre.py et annonce.py ne relancent pas des pigeons
+# que l'utilisateur a arrêtés lui-même. L'affichage réécrit _affichage.txt toutes les 2 s (son numéro de processus) : un
+# fichier vieux dit qu'il est figé.
+ARRET = ICI / "arret_volontaire.json"
+AFFICHAGE = DEMANDES / "_affichage.txt"
+AFFICHAGE_FIGE_S = 5          # l'affichage sans image depuis 5 s : sa pile va dans le journal (la vraie cause d'un gel)
 OUTILS_ECRITURE = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 CONFLIT_S = 300               # deux IA qui écrivent le même fichier à moins de 5 min : conflit possible
 PROJETS = Path.home() / ".claude" / "projects"
@@ -61,9 +68,12 @@ APPEL_RECALE_PX = 350         # ... et ne se déplace que si la souris s'éloign
 GUIDE_PX = 300                # au-delà de 300 px de l'endroit montré, une flèche près de la souris
 LECTURE_INITIALE = 512 * 1024 # à la première lecture d'un journal, on ne lit que sa fin
 TOUR_S = 1.0                  # le guetteur refait le tour chaque seconde
+GUETTEUR_FIGE_S = 30          # sans tour depuis 30 s, le guetteur est figé : sa pile va dans le journal
+GUETTEUR_RELANCE_S = 120      # mort, ou figé depuis 2 min : l'affichage relance un guetteur (au plus un par 5 min)
 GARDE_ICONES_S = 4.0          # une liste d'icônes lue sert 4 s (relue tout de suite si la fenêtre bouge)
 SURVOL_PX = 26                # la souris à moins de 26 px du pigeon : sa bulle s'ouvre
 FERMEE_GRACE_S = 120          # une session fermée qui reprend un outil plus de 2 min après se rouvre
+LIVRABLES_S = 24 * 3600       # les livrables d'une session qui s'est terminée elle-même restent 24 h, ou jusqu'à « Oublier »
 TRACE_S = 0.25                # la ligne qui se dessine à son apparition : 250 ms
 
 # Couleurs des sessions, données dans l'ordre d'arrivée ; la clé de transparence
@@ -81,6 +91,14 @@ REGLAGES_DEFAUT = {
                               # « les lignes pointillées restent ma préférence, moins fatigant visuellement »)
     "duree_appel_s": 20,      # ... pendant combien de secondes
     "bulles": "courte",       # courte : une ligne quand il montre ou appelle ; survol : seulement au survol
+    # La bulle de consigne à côté de l'encadré de la cible (l'utilisateur, 3 octobre 2026, 23h36 : « il y a trop de fois où la
+    # bulle cache la cible, et les alentours ») : non par défaut ; la consigne reste dans le panneau (« À faire pour toi »).
+    "bulle_cible": False,
+    # La balise (l'utilisateur, 5 octobre 2026, 22h57 : « une bulle qui mentionne où exactement », sur la ligne, avant la cible ;
+    # elle ne la couvre jamais). Détail : « court » (l'app et l'élément) ou « complet » (avec l'onglet ou le dossier).
+    "balise": True,
+    "balise_detail": "complet",
+    "balise_respire": False,  # le halo qui respire lentement (3 s), comme l'indicateur de Windows-MCP
     "pigeonneaux": True,      # montrer les sous-agents
     "guidage": "fleches",     # fleches : des flèches autour de la souris ; lignes : des pointillés souris -> but
     "fleche_creuse": True,    # les flèches près de la souris : juste le contour (l'utilisateur, 11h28)
@@ -94,7 +112,7 @@ REGLAGES_DEFAUT = {
     "couleur_fond": "#16171b",
     "couleur_texte": "#e9e9ec",
     "couleur_accent": "#8ab4ff",
-    "bulles_couleurs": "papier",  # papier (claires) | theme (aux couleurs du panneau)
+    "bulles_couleurs": "papier",  # papier (claires) | theme (aux couleurs du panneau) | sombre (toujours sombres)
     # Les pigeons eux-mêmes (l'utilisateur, 3 octobre 09h07 : « ça ajoute du bruit ; je reste avec les lignes de guidage et
     # les flèches en option ; maintenant que l'app et mes idées ont évolué, ils n'apportent rien ; on garde le nom ») :
     # cachés par défaut. Les lignes, les flèches, les encadrés, les étiquettes et la bulle de consigne restent.
@@ -150,6 +168,7 @@ REGLAGES_DEFAUT = {
     "encadres_arrondi": 6,       # le rayon des coins, en px (0 : coins carrés)
     "encadres_style": "pointilles",  # pointilles | plein
     "encadres_montre": True,     # encadrer aussi l'endroit montré par une demande (montre.py)
+    "encadres_travail": True,    # sans pigeons : encadrer où chaque IA travaille, avec son nom (l'utilisateur, 3 octobre, 18h3x)
     # Le code d'importance (même message : « code de couleur d'importance des tâches ? ») : le corps du pigeon
     # garde la couleur de sa tâche ; l'anneau, les flèches, les lignes et les encadrés prennent celle de l'importance.
     "couleur_guides": "tache",   # tache | importance
@@ -174,6 +193,26 @@ ANGLAIS = {
     "d'abord : clique ici pour ramener « {w} » devant": "first: click here to bring “{w}” to the front",
     "la fenêtre « {w} » est derrière : ramène-la devant": "the window “{w}” is behind: bring it to the front",
     "Regarde ici": "Look here", "te montre : ": "shows you: ", "Permission à donner : ": "Permission needed: ",
+    # la balise et le repérage précis (5 octobre 2026)
+    "bouton « {e} »": "button “{e}”", "« {a} » est réduite": "“{a}” is minimized", "« {a} » est derrière": "“{a}” is behind",
+    "je ne trouve pas l'onglet « {o} » dans « {w} »": "I can't find the tab “{o}” in “{w}”",
+    "onglet « {o} »": "tab “{o}”", "ouvre l'onglet « {o} »": "open the tab “{o}”",
+    "d'abord : ouvre l'onglet « {o} »": "first: open the tab “{o}”",
+    "je ne trouve pas la page dans « {w} »": "I can't find the page in “{w}”",
+    " ; les noms proches : {n}": "; close names: {n}",
+    " ; si c'est dans un autre onglet, donne --onglet": "; if it is in another tab, give --onglet",
+    "« {f} » est caché": "“{f}” is hidden", "Bureau": "Desktop", "écran principal": "main screen",
+    "écran de gauche": "left screen", "écran de droite": "right screen", "écran du bas": "bottom screen",
+    "écran du haut": "top screen", "bouton": "button", "onglet": "tab", "élément": "item",
+    "menu": "menu", "case": "checkbox", "option": "option", "zone de texte": "text box", "liste": "list",
+    "page": "page", "image": "image", "groupe": "group", "Explorateur": "File Explorer",
+    "Invite de commandes": "Command Prompt", "Bloc-notes": "Notepad",
+    "sous « {a} »": "under “{a}”", "fais défiler {d}": "scroll {d}", "dépose ici": "drop here",
+    "La balise": "The beacon", "Ce que dit la balise": "What the beacon says",
+    "Une balise sur la ligne : où est exactement la cible (l'app, l'onglet, ce qui la couvre)":
+        "A beacon on the line: exactly where the target is (the app, the tab, what covers it)",
+    "Tout le chemin": "The whole path", "L'app et l'élément": "The app and the item",
+    "Le halo de la balise respire lentement": "The beacon's halo breathes slowly",
     "Claude a besoin de toi": "Claude needs you", "bloquée : attend ta permission": "blocked: needs your permission",
     "Je t'attends": "Waiting for you", "t'attend (vient te chercher)": "waiting (coming to get you)",
     "t'attend": "waiting for you", "au repos": "resting", "{o} (pas de fichier)": "{o} (no file)",
@@ -195,6 +234,10 @@ ANGLAIS = {
     "Aller": "Go", "Reprendre": "Resume", "Guider": "Guide", "C'est fait": "Done", "Plus tard ▾": "Later ▾",
     "Dans 5 min": "In 5 min", "Dans 15 min": "In 15 min", "Dans 1 h": "In 1 h", "Sans limite": "No limit",
     "lien": "link", "dossier": "folder", "fichier": "file", "Montrer": "Show", "Ouvrir": "Open", "Copier": "Copy",
+    "texte": "text", "Oublier": "Dismiss", "Livrables des sessions finies": "Deliverables of finished sessions",
+    "Copie le texte du bloc (un prompt, une commande).": "Copies the block's text (a prompt, a command).",
+    "Ces livrables s'en vont du panneau (la session reste terminée).": "These deliverables leave the panel (the session stays finished).",
+    "terminée ": "finished ",
     " · guides masqués": " · guides hidden", "pigeonneau": "squab", "pigeonneaux": "squabs",
     # les réglages
     "Ligne vers l'endroit exact où il travaille": "Line to the exact spot it works on",
@@ -230,6 +273,7 @@ ANGLAIS = {
     "Encadrés": "Frames", "Actifs, toujours affichés": "On, always shown",
     "Actifs quand ma souris approche": "On when my mouse gets close", "Désactivés": "Off",
     "Encadrer aussi l'endroit montré par une demande": "Also frame the spot shown by a request",
+    "Sans pigeons, encadrer où chaque IA travaille (avec son nom)": "Without pigeons, frame where each AI works (with its name)",
     "En pointillés": "Dotted", "En trait plein": "Solid", "Épaisseur (px)": "Thickness (px)",
     "Quand une session m'attend": "When a session is waiting for me",
     "Le pigeon vient près de ma souris": "The pigeon comes near my mouse", "Pendant (secondes)": "For (seconds)",
@@ -286,7 +330,9 @@ ANGLAIS = {
     "Par défaut": "Default", "Nuit": "Night", "Ambre": "Amber", "Contraste": "Contrast", "Normal": "Normal",
     "Fort": "Strong", "Mes couleurs :": "My colors:", "Fond": "Background", "Texte": "Text", "Accent": "Accent",
     "Bulles et étiquettes": "Bubbles and labels", "Papier (claires)": "Paper (light)",
-    "Aux couleurs du thème": "Theme colors",
+    "Aux couleurs du thème": "Theme colors", "Sombres": "Dark",
+    "Une bulle près de la cible (sinon, la consigne reste dans le panneau)":
+        "A bubble near the target (otherwise, the instruction stays in the panel)",
     "« Système » suit le thème clair ou sombre de Windows. « Ambre » reprend les couleurs d'Antigravity.":
         "“System” follows Windows' light or dark theme. “Amber” uses Antigravity's colors.",
     "Rechercher": "Search", "Le guidage": "Guidance", "L'app": "The app",
@@ -399,6 +445,11 @@ def palette(r):
                    BOUTON_ACTIF=melanger(pal["FOND"], pal["TEXTE"], 0.32))
     if r.get("bulles_couleurs") == "theme":
         pal.update(BULLE_FOND=pal["CARTE"], BULLE_TEXTE=pal["TEXTE"])
+    elif r.get("bulles_couleurs") == "sombre":
+        # Sombres quel que soit le thème du panneau (l'utilisateur, 3 octobre, 19h09:36 : « unifier l'esthétique des bulles, thème
+        # sombre, fond sombre des bulles et de la couleur de police ») : le fond et le texte des cartes du thème sombre choisi.
+        sombre = PALETTES.get(r.get("theme_sombre"), PALETTES["defaut"])
+        pal.update(BULLE_FOND=sombre["CARTE"], BULLE_TEXTE=sombre["TEXTE"])
     else:
         pal.update(BULLE_FOND="#fffdf5", BULLE_TEXTE="#1b1b1b")
     return pal
@@ -421,6 +472,11 @@ def contenu_guide():
                 "the body has its session's color; a breathing ring: it is waiting for you; dotted: paused.",
                 "• Two linked targets (drag a file into a folder, or click here then there): an arrowed line goes "
                 "from the first to the second, their frames show 1 and 2, and labels say “take this” and “drop here”.",
+                "• The beacon: on the line, just before the target, a small label says exactly where it is: the app, "
+                "the tab, the button (“Chrome › tab “Gemini” › button “Send””). If another window covers the target, an "
+                "amber chip says which one, and step 1 shows the app's taskbar button first; a hidden tab is shown "
+                "first too. The beacon never covers the target: it moves back along the line, and fades out when your "
+                "mouse is close (Settings, Guidance).",
                 "• Squabs are a session's sub-agents."]},
             {"titre": "Importance colors", "couleurs": True, "texte": ["You can change these colors in Settings."]},
             {"titre": "The panel", "texte": [
@@ -479,6 +535,11 @@ def contenu_guide():
             "• Deux cibles liées (glisser un fichier dans un dossier, ou cliquer ici puis là) : une ligne fléchée va de "
             "la première à la seconde, leurs encadrés portent 1 et 2, et des étiquettes disent « prends ceci » et "
             "« dépose ici ».",
+            "• La balise : sur la ligne, juste avant la cible, une petite étiquette dit où elle est exactement : "
+            "l'app, l'onglet, le bouton (« Chrome › onglet « Gemini » › bouton « Envoyer » »). Si une autre fenêtre "
+            "couvre la cible, une puce ambre dit laquelle, et l'étape 1 montre d'abord le bouton de l'app dans la barre "
+            "des tâches ; un onglet caché se montre d'abord aussi. La balise ne couvre jamais la cible : elle recule "
+            "le long de la ligne, et s'efface quand ta souris est tout près (Réglages, Guidage).",
             "• Les pigeonneaux sont les sous-agents d'une session."]},
         {"titre": "Les couleurs d'importance", "couleurs": True, "texte": ["Ces couleurs se changent dans Réglages."]},
         {"titre": "Le panneau", "texte": [
@@ -562,6 +623,17 @@ _journal.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s")
 logging.basicConfig(level=logging.INFO, handlers=[_journal])
 log = logging.getLogger("pigeons")
 
+
+# Un fil qui meurt sur une erreur l'écrit dans le journal. Sous pythonw, il n'y a pas de sortie d'erreur : sans ceci,
+# le guetteur est mort sans un mot à l'ouverture de session du 5 octobre 2026 (19h11), et le registre activite.json
+# est resté figé pendant que le panneau, lui, tournait (annonce.py et montre.py disaient « les pigeons ne tournent pas »).
+def _fil_mort(a):
+    log.error("le fil %s s'est arrêté sur une erreur", a.thread.name if a.thread else "?",
+              exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+
+
+threading.excepthook = _fil_mort
+
 user32 = ctypes.windll.user32
 dwmapi = ctypes.windll.dwmapi
 user32.WindowFromPoint.restype = W.HWND
@@ -642,6 +714,87 @@ def fenetres_visibles():
     return sortie
 
 
+def fenetres_reduites(titre):
+    """Les fenêtres réduites dans la barre des tâches dont le titre contient ce texte (hors celles des pigeons)."""
+    t, sortie, pid = titre.casefold(), [], ctypes.c_ulong()
+    Rappel = ctypes.WINFUNCTYPE(ctypes.c_bool, W.HWND, W.LPARAM)
+
+    def rappel(h, _l):
+        if user32.IsWindowVisible(h) and user32.IsIconic(h) and t in titre_de(h).casefold():
+            user32.GetWindowThreadProcessId(h, ctypes.byref(pid))
+            if pid.value != os.getpid():
+                sortie.append(h)
+        return True
+    user32.EnumWindows(Rappel(rappel), 0)
+    return sortie
+
+
+# Le nom qu'on dit à l'utilisateur pour un programme (la balise : « Chrome › onglet « Gemini » › bouton « Envoyer » »).
+NOMS_D_APPS = {"chrome.exe": "Chrome", "msedge.exe": "Edge", "firefox.exe": "Firefox", "brave.exe": "Brave",
+               "explorer.exe": "Explorateur", "claude.exe": "Claude", "code.exe": "VS Code", "cursor.exe": "Cursor",
+               "antigravity.exe": "Antigravity", "windowsterminal.exe": "Terminal", "powershell.exe": "PowerShell",
+               "cmd.exe": "Invite de commandes", "notepad.exe": "Bloc-notes", "winword.exe": "Word",
+               "excel.exe": "Excel", "powerpnt.exe": "PowerPoint", "obsidian.exe": "Obsidian", "discord.exe": "Discord",
+               "steam.exe": "Steam", "steamwebhelper.exe": "Steam", "godot.exe": "Godot"}
+_APPS = {}
+
+
+def app_de(hwnd):
+    """(nom à dire, chemin de l'exécutable) du programme d'une fenêtre ; gardé par processus. Le nom vient d'une
+    petite table, sinon de la description du fichier, sinon du nom de l'exécutable."""
+    pid = ctypes.c_ulong()
+    user32.GetWindowThreadProcessId(W.HWND(hwnd), ctypes.byref(pid))
+    if pid.value in _APPS:
+        return _APPS[pid.value]
+    exe = ""
+    k32 = ctypes.windll.kernel32
+    h = k32.OpenProcess(0x1000, False, pid.value)                     # PROCESS_QUERY_LIMITED_INFORMATION
+    if h:
+        b, n = ctypes.create_unicode_buffer(520), W.DWORD(520)
+        if k32.QueryFullProcessImageNameW(h, 0, b, ctypes.byref(n)):
+            exe = b.value
+        k32.CloseHandle(h)
+    base = os.path.basename(exe).lower()
+    if base == "applicationframehost.exe":
+        return titre_de(hwnd) or "Windows", exe    # l'hôte des apps du Windows Store : son titre dit l'app (pas gardé)
+    if base.startswith("godot"):
+        base = "godot.exe"
+    nom = NOMS_D_APPS.get(base)
+    if not nom and exe:
+        try:
+            import win32api
+            lang, page = win32api.GetFileVersionInfo(exe, "\\VarFileInfo\\Translation")[0]
+            nom = win32api.GetFileVersionInfo(exe, f"\\StringFileInfo\\{lang:04x}{page:04x}\\FileDescription")
+        except Exception:
+            nom = None
+    nom = tr(nom or os.path.splitext(os.path.basename(exe))[0] or "?")
+    if len(_APPS) > 300:
+        _APPS.clear()
+    _APPS[pid.value] = (nom, exe)
+    return nom, exe
+
+
+def nom_ecran(ecrans, x, y):
+    """« écran de gauche », « écran du bas »... par rapport à l'écran principal (pour la balise et montre.py)."""
+    e = ecran_de(ecrans, x, y)
+    p = next((e for e in ecrans if e["principal"]), None)
+    if not e or not p or e is p:
+        return tr("écran principal")
+    (l, t, r, b), (pl, pt, pr, pb) = e["rect"], p["rect"]
+    if r <= pl:
+        return tr("écran de gauche")
+    if l >= pr:
+        return tr("écran de droite")
+    return tr("écran du bas") if t >= pb else tr("écran du haut")
+
+
+# Les genres de l'automatisation de Windows, en mots (la balise : « bouton « Envoyer » »).
+GENRES = {50000: "bouton", 50031: "bouton", 50005: "lien", 50019: "onglet", 50007: "élément", 50024: "élément",
+          50011: "menu", 50002: "case", 50013: "option", 50004: "zone de texte", 50003: "liste", 50020: "texte",
+          50030: "page", 50006: "image", 50026: "groupe"}
+CLIQUABLES = (50000, 50031, 50005, 50019, 50007, 50024, 50011, 50002, 50013, 50004, 50003)
+
+
 # ------------------------------------------------------ les journaux de Claude
 
 def heure_de(ligne):
@@ -698,14 +851,17 @@ def chemin_touche(outil, entree, dossier_courant):
 
 RE_LIEN_MD = re.compile(r"\[([^\]\n]{1,80})\]\(([^)\s]+)\)")
 RE_URL = re.compile(r"https?://[^\s)>\]\"'`]+")
+RE_BLOC = re.compile(r"^[ \t]*```[^\n`]*\n(.*?)\n[ \t]*```", re.S | re.M)   # un bloc de code Markdown, son contenu seul
 
 
 def sorties_de(texte, dossier):
     """Les liens et les fichiers qu'une réponse de Claude cite (l'utilisateur, 12h07 : « je me demande où sont les
     output ; accélérer le workflow sans chercher dans mon ordi ou mes navigateurs »).
-    Rend [{"genre": "lien" | "fichier", "valeur": l'adresse ou le chemin complet, "nom": ce qu'on affiche}],
-    sans doublon, 8 au plus. Les liens Markdown relatifs se lisent depuis le dossier de la session ;
-    un « :42 » de numéro de ligne est retiré ; on ne garde que les fichiers qui existent."""
+    Rend [{"genre": "lien" | "fichier" | "texte", "valeur": l'adresse, le chemin complet ou le texte, "nom": ce qu'on
+    affiche}], sans doublon, 8 au plus. Les liens Markdown relatifs se lisent depuis le dossier de la session ;
+    un « :42 » de numéro de ligne est retiré ; on ne garde que les fichiers qui existent.
+    Les blocs de code (```...```) viennent en premier, 3 au plus (l'utilisateur, 3 octobre, 18h29 : « j'aurai aimé cliqué sur le
+    bouton pour copier le prompt ») : un prompt ou une commande à coller se copie d'un clic."""
     from urllib.parse import unquote, urlparse
     items, vus = [], set()
 
@@ -714,6 +870,12 @@ def sorties_de(texte, dossier):
         if cle not in vus and len(items) < 8:
             vus.add(cle)
             items.append({"genre": genre, "valeur": valeur, "nom": nom})
+
+    for bloc in RE_BLOC.findall(texte or "")[:3]:
+        bloc = bloc.strip("\r\n")
+        if len(bloc.strip()) >= 20:                 # un mot seul ne vaut pas un bouton
+            premiere = next((l.strip() for l in bloc.splitlines() if l.strip()), "")
+            ajouter("texte", bloc, premiere)
 
     for nom, cible in RE_LIEN_MD.findall(texte or ""):
         if cible.startswith(("http://", "https://")):
@@ -790,6 +952,8 @@ class Session:
         self.ecrits = deque(maxlen=50)  # (fichier, heure) des écritures (Edit, Write...) : pour les conflits
         self.annonce = None             # pour une autre IA : sa dernière annonce (annonce.py)
         self.fermee = None              # l'heure où elle a été fermée (« Terminer », montre.py --termine)
+        self.fermee_par = None          # « danny » (Terminer) ou « session » (montre.py --termine)
+        self.livrables_vus = False      # l'utilisateur a cliqué « Oublier » sur ses livrables (voir Guetteur.livrables)
         self.archivee = False           # archivée dans l'app Claude (sa fiche, voir lire_fiches_app)
         self.position = None            # où on en est dans le fichier
         self.reste = b""
@@ -918,13 +1082,18 @@ class Guetteur(threading.Thread):
         self.cache_icones = {}           # hwnd -> (heure de lecture, cadre de la fenêtre, icônes)
         self.cache_elements = {}         # (titre, élément) -> (heure, rect, hwnd)
         self.fenetres_retenues = {}      # titre demandé -> hwnd trouvé (le titre peut changer ensuite)
+        self.infos_elements = {}         # (titre, élément, fenêtre) -> {genre, nom, hors} : pour la balise
         self.parc_info = None            # où ranger les pigeons qui attendent (voir trouver_parc)
         self.fiches_app = {}             # fiche de l'app Claude -> (heure de modification, session, archivée)
         self.archivees = set()           # les sessions archivées dans l'app Claude
         self.t_fiches = 0.0
         self.conflits = []               # [(fichier, [titres])] : deux IA qui écrivent le même fichier (le panneau)
+        self.livrables = []              # les livrables des sessions qui se sont terminées elles-mêmes (le panneau)
         self.t_activite = 0.0
         self.tours = 0
+        self.battement = time.time()     # la fin du dernier tour : l'affichage s'en sert pour voir s'il est figé
+        self.actif = True                # faux quand l'affichage l'a remplacé par un autre guetteur
+        self.signale = False             # sa pile est déjà dans le journal
 
     # -- Windows : l'automatisation (UIA) lit le nom et la place des icônes et des boutons
     def preparer_uia(self):
@@ -944,12 +1113,21 @@ class Guetteur(threading.Thread):
         self.shell = win32com.client.Dispatch("Shell.Application")
 
     def run(self):
-        self.preparer_uia()
-        while True:
+        # La préparation peut échouer à l'ouverture de session de Windows (5 octobre 2026, 19h11 : le guetteur est mort
+        # là, sans un mot). On la refait toutes les 5 s, en l'écrivant dans le journal.
+        while self.actif:
+            try:
+                self.preparer_uia()
+                break
+            except Exception:
+                log.exception("préparation de l'automatisation de Windows (nouvel essai dans 5 s)")
+                time.sleep(5)
+        while self.actif:
             try:
                 self.tour()
             except Exception:
                 log.exception("tour du guetteur")
+            self.battement = time.time()
             time.sleep(TOUR_S)
 
     # -- 1. les journaux et les demandes
@@ -1132,7 +1310,12 @@ class Guetteur(threading.Thread):
                 # Pour l'IA qui a fait une demande (montre.py) : sa cible est-elle trouvée à l'écran, et sinon pourquoi.
                 "demande": ({"texte": (etats[s.ident].get("bulle") or "").split("\n")[0],
                              "trouvee": bool(etats[s.ident].get("trouvee")),
-                             "precision": etats[s.ident].get("precision") or ""}
+                             "precision": etats[s.ident].get("precision") or "",
+                             # « cree » : l'heure de la demande (montre.py attend la réponse à SA demande) ; « ou » : ce
+                             # que la balise dit à l'utilisateur (l'app, l'onglet, l'élément, ce qui le couvre, les noms proches).
+                             "cree": (s.demande or {}).get("heure"),
+                             "point": etats[s.ident].get("cible"),
+                             "ou": {k: v for k, v in (etats[s.ident].get("ou") or {}).items() if k != "exe"}}
                             if etats[s.ident]["mode"] == "montre" else None),
                 "fichier": s.chemin, "dossier": projet_de(s.chemin), "ecrits": ecrits,
                 "dernier_geste": datetime.fromtimestamp(s.dernier_geste).isoformat(timespec="seconds")
@@ -1161,9 +1344,12 @@ class Guetteur(threading.Thread):
                 if maintenant - d.get("heure", 0) > 3 * 86400:
                     f.unlink(missing_ok=True)
                     continue
-                fermes[f.stem] = d.get("heure", 0)
+                fermes[f.stem] = d
         for s in self.sessions.values():
-            s.fermee = fermes.get(s.ident)
+            d = fermes.get(s.ident) or {}
+            s.fermee = d.get("heure", 0) if d else None
+            s.fermee_par = d.get("par")
+            s.livrables_vus = bool(d.get("livrables_vus"))
             s.archivee = s.ident in self.archivees
             if s.fermee and not s.est_fermee():
                 # Elle est repartie (l'utilisateur lui a écrit, ou elle travaille encore) : la fermeture est oubliée.
@@ -1269,40 +1455,131 @@ class Guetteur(threading.Thread):
                 sortie.append(h)
         return sortie
 
-    def trouver_element(self, titre, element):
+    def trouver_element(self, titre, element, seulement=None):
         """Le bouton, le lien ou la case dont le nom contient « element », dans une fenêtre dont le titre
         contient « titre ». Plusieurs fenêtres peuvent porter le titre (« Mon projet » est aussi le nom
         d'une session) : on cherche dans chacune, la plus en avant d'abord, jusqu'à trouver.
         Une fenêtre trouvée une fois est retenue : son titre peut changer (l'Explorateur prend le nom du
-        dossier qu'on ouvre) sans que le pigeon la perde."""
-        cle = (titre, element)
+        dossier qu'on ouvre) sans que le pigeon la perde. seulement : chercher dans cette fenêtre-là (celle de
+        l'onglet demandé). Ce qu'on sait de l'élément (son genre, son nom, s'il faut défiler) va dans
+        self.infos_elements, pour la balise."""
+        cle = (titre, element, seulement)
         vieux = self.cache_elements.get(cle)
         if vieux and time.time() - vieux[0] < 2.0:
             return vieux[1], vieux[2]
-        candidates = self.trouver_fenetres(titre)
+        candidates = [seulement] if seulement else self.trouver_fenetres(titre)
         retenue = self.fenetres_retenues.get(titre)
-        if retenue and user32.IsWindow(W.HWND(retenue)) and retenue not in candidates:
+        if not seulement and retenue and user32.IsWindow(W.HWND(retenue)) and retenue not in candidates:
             candidates.append(retenue)
         rect, hwnd = None, (candidates[0] if candidates else None)
+        self.infos_elements[cle] = None
         if candidates and not element:
             rect = cadre_visible(hwnd)
         elif candidates:
             # 3 = la casse ignorée + une partie du nom suffit (Windows 10 1809 et plus)
             cond = self.uia.CreatePropertyConditionEx(self.U.UIA_NamePropertyId, element, 3)
+            cherche = element.casefold().strip()
             for h in candidates:
                 try:
-                    el = self.uia.ElementFromHandle(W.HWND(h)).FindFirst(self.U.TreeScope_Descendants, cond)
-                    if el:
+                    tab = self.uia.ElementFromHandle(W.HWND(h)).FindAll(self.U.TreeScope_Descendants, cond)
+                    # Le meilleur des noms qui contiennent « element » (5 octobre 2026 : « Envoyer » trouvait
+                    # « Envoyer un commentaire » avant le vrai bouton) : le nom exact, puis celui qui commence ainsi,
+                    # puis le plus court ; un élément visible avant un élément hors de la vue.
+                    choix = []
+                    for i in range(min(tab.Length, 40)):
+                        el = tab.GetElement(i)
                         r = el.CurrentBoundingRectangle
-                        if r.right > r.left:
-                            rect, hwnd = (r.left, r.top, r.right, r.bottom), h
-                            break
+                        if r.right <= r.left:
+                            continue
+                        nom = " ".join((el.CurrentName or "").split())
+                        n = nom.casefold()
+                        rang = (0 if n == cherche else 1 if n.startswith(cherche) else 2, bool(el.CurrentIsOffscreen), len(n), i)
+                        choix.append((rang, el, nom, (r.left, r.top, r.right, r.bottom)))
+                    if choix:
+                        _rang, el, nom, rect = min(choix, key=lambda x: x[0])
+                        hwnd = h
+                        self.infos_elements[cle] = {"genre": GENRES.get(el.CurrentControlType, ""), "nom": nom or element,
+                                                    "hors": bool(el.CurrentIsOffscreen)}
+                        break
                 except Exception as e:
                     log.warning("recherche de %r dans %r : %s", element, titre, e)
         if hwnd:
             self.fenetres_retenues[titre] = hwnd
         self.cache_elements[cle] = (time.time(), rect, hwnd)
         return rect, hwnd
+
+    def trouver_onglet(self, titre, onglet):
+        """L'onglet (d'un navigateur) dont le nom contient « onglet », dans une fenêtre dont le titre contient
+        « titre » : (rect, affiché ?, fenêtre), ou None. L'automatisation de Windows ne voit que la page de l'onglet
+        AFFICHÉ (essai du 5 octobre 2026, 23h : le bouton « Envoyer » de Gemini était introuvable, son onglet était
+        caché) ; le guidage passe donc d'abord par l'onglet."""
+        cle = ("onglet", titre, onglet)
+        vieux = self.cache_elements.get(cle)
+        if vieux and time.time() - vieux[0] < 1.0:
+            return vieux[1]
+        U, sortie = self.U, None
+        cond = self.uia.CreateAndCondition(
+            self.uia.CreatePropertyCondition(U.UIA_ControlTypePropertyId, U.UIA_TabItemControlTypeId),
+            self.uia.CreatePropertyConditionEx(U.UIA_NamePropertyId, onglet, 3))
+        for h in self.trouver_fenetres(titre) + fenetres_reduites(titre):
+            try:
+                el = self.uia.ElementFromHandle(W.HWND(h)).FindFirst(U.TreeScope_Descendants, cond)
+                if el:
+                    r = el.CurrentBoundingRectangle
+                    motif = el.GetCurrentPattern(U.UIA_SelectionItemPatternId)
+                    choisi = bool(motif and motif.QueryInterface(U.IUIAutomationSelectionItemPattern).CurrentIsSelected)
+                    sortie = ((r.left, r.top, r.right, r.bottom), choisi, h)
+                    break
+            except Exception as e:
+                log.warning("recherche de l'onglet %r dans %r : %s", onglet, titre, e)
+        self.cache_elements[cle] = (time.time(), sortie)
+        return sortie
+
+    @staticmethod
+    def zone_de_page(hwnd):
+        """Le rectangle de la page dans un navigateur de la famille de Chrome (Chrome, Edge, l'app Claude) : sa fenêtre
+        fille Chrome_RenderWidgetHostHWND visible la plus grande. Pour --page : les coordonnées de
+        getBoundingClientRect y commencent."""
+        zones = []
+        Rappel = ctypes.WINFUNCTYPE(ctypes.c_bool, W.HWND, W.LPARAM)
+
+        def rappel(h, _l):
+            if nom_de_classe(h) == "Chrome_RenderWidgetHostHWND" and user32.IsWindowVisible(h):
+                r = W.RECT()
+                user32.GetWindowRect(h, ctypes.byref(r))
+                zones.append((r.left, r.top, r.right, r.bottom))
+            return True
+        user32.EnumChildWindows(W.HWND(hwnd), Rappel(rappel), 0)
+        return max(zones, key=lambda z: (z[2] - z[0]) * (z[3] - z[1]), default=None)
+
+    def noms_proches(self, hwnd, element, n=6):
+        """Quand « element » est introuvable : les noms des éléments cliquables visibles de la fenêtre qui lui
+        ressemblent le plus (pour que l'IA vise juste au deuxième essai, sans deviner)."""
+        import difflib
+        cle = ("proches", hwnd, element)
+        vieux = self.cache_elements.get(cle)
+        if vieux and time.time() - vieux[0] < 5.0:
+            return vieux[1]
+        U, noms = self.U, []
+        try:
+            cond = None
+            for g in CLIQUABLES:                     # « l'un de ces genres » : des OU deux à deux (sûr avec comtypes)
+                c = self.uia.CreatePropertyCondition(U.UIA_ControlTypePropertyId, g)
+                cond = c if cond is None else self.uia.CreateOrCondition(cond, c)
+            tab = self.uia.ElementFromHandle(W.HWND(hwnd)).FindAllBuildCache(U.TreeScope_Descendants, cond, self.cache_req)
+            for i in range(min(tab.Length, 600)):
+                it = tab.GetElement(i)
+                nom = " ".join((it.CachedName or "").split())
+                if nom and not it.CachedIsOffscreen and nom not in noms:
+                    noms.append(nom)
+        except Exception as e:
+            log.warning("noms proches de %r : %s", element, e)
+        cherche = (element or "").casefold()
+        proches = [x for x in noms if cherche and (cherche in x.casefold() or x.casefold() in cherche)]
+        proches += [x for x in difflib.get_close_matches(element or "", noms, n=n, cutoff=0.62) if x not in proches]
+        proches = [court(x, 40) for x in proches[:n]]
+        self.cache_elements[cle] = (time.time(), proches)
+        return proches
 
     def situer_session(self, titre, question=None):
         """Où répondre à une session qui attend, dans l'app Claude (l'utilisateur, 10h43 : une petite flèche près de la
@@ -1398,6 +1675,7 @@ class Guetteur(threading.Thread):
         La barre groupe les fenêtres par programme (« Explorateur de fichiers - 2 fenêtres en cours... ») :
         on prend le nom du programme à la fin du titre (« Mon projet : Explorateur de fichiers »,
         « Page - Google Chrome ») et on cherche le bouton qui commence par ce nom."""
+        self.rect_bouton = None
         titre = titre_de(hwnd).replace("\xa0", " ")
         programme = re.split(r" [-:] ", titre)[-1].strip().casefold()
         if not programme:
@@ -1410,6 +1688,7 @@ class Guetteur(threading.Thread):
                 b = tab.GetElement(i)
                 if (b.CurrentName or "").casefold().startswith(programme):
                     r = b.CurrentBoundingRectangle
+                    self.rect_bouton = (r.left, r.top, r.right, r.bottom)
                     return ((r.left + r.right) // 2, (r.top + r.bottom) // 2)
         except Exception as e:
             log.warning("bouton de la barre des tâches : %s", e)
@@ -1499,45 +1778,182 @@ class Guetteur(threading.Thread):
         return {"mode": "parc", "x": None, "y": None, "centre": None, "detail": tr("{f} (hors Bureau)", f=fichier)}
 
     def situer_cible(self, c, fenetres):
-        """Un endroit demandé par montre.py : un fichier, un bouton dans une fenêtre, ou un point de l'écran.
-        Rend (point où pointer, précision pour la bulle, zone où un clic de l'utilisateur compte comme « fait ») ;
-        (None, raison, None) si on ne trouve pas."""
+        """Un endroit demandé par montre.py : un fichier, un bouton dans une fenêtre (--element), un rectangle d'une
+        page web (--page), ou un point de l'écran. Rend (point où pointer, précision pour la bulle, zone où un clic de
+        l'utilisateur compte comme « fait », ou) ; (None, raison, None, ou) si on ne trouve pas.
+
+        « ou » dit à l'utilisateur où est exactement la cible (la balise, son idée du 5 octobre 2026 à 22h57 : « c'est souvent
+        à la bonne position de l'écran, mais il y a des fenêtres par-dessus ; quelques mots pour orienter : quelle
+        couche, quelle app ») : {app, exe, lieu, element, etape1, obstacle, defiler, proches, ecran}. etape1 : la cible
+        n'est pas encore cliquable, le point est une étape d'avant (le bouton de la barre des tâches, l'onglet)."""
         if not c:
-            return None, "", None
+            return None, "", None, {}
         if c.get("point"):
-            return tuple(c["point"]), "", None
+            return self.situer_point(c)
         if c.get("fichier"):
-            s = self.situer_fichier(c["fichier"], fenetres)
-            if s["mode"] == "pose":
-                return s["centre"], "", s.get("rect")
-            if s["mode"] == "perche":
-                return (s["x"], s["y"] + 10), tr("c'est caché sous cette fenêtre"), None
-            return None, tr("je ne vois pas {f} à l'écran", f=os.path.basename(c['fichier'])), None
+            return self.situer_icone(c, fenetres)
         if c.get("fenetre"):
             # Le panneau des pigeons : ses boutons sont dessinés par Tk, que l'automatisation de Windows ne voit pas ;
             # la volée publie leur place chaque seconde (essai d'AG, 3 octobre : « Réglages » introuvable).
-            rect, hwnd = self.element_du_panneau(c["fenetre"], c.get("element")) or \
-                self.trouver_element(c["fenetre"], c.get("element"))
-            if not hwnd:
-                return None, tr("la fenêtre « {w} » n'est pas ouverte", w=c['fenetre']), None
-            if not rect:
-                return None, tr("je ne trouve pas « {e} » dans « {w} »", e=c.get('element'), w=c['fenetre']), None
+            panneau = self.element_du_panneau(c["fenetre"], c.get("element"))
+            if panneau:
+                rect = panneau[0]
+                return (((rect[0] + rect[2]) // 2, (rect[1] + rect[3]) // 2), "", rect,
+                        {"app": "Pigeons", "element": tr("bouton « {e} »", e=c.get("element"))})
+            return self.situer_dans_fenetre(c)
+        return None, "", None, {}
+
+    def ou_fenetre(self, hwnd):
+        """Le début de « ou » pour une fenêtre : l'app et son exécutable."""
+        app, exe = app_de(hwnd)
+        return {"app": app, "exe": exe}
+
+    def devant_dabord(self, hwnd, ou, point, zone, reduite=False):
+        """La fenêtre de la cible est réduite, ou une autre la couvre : on montre d'abord son bouton dans la barre des
+        tâches (étape 1), et la balise dit pourquoi (« Chrome est derrière », « sous l'Explorateur »)."""
+        app = ou.get("app") or "?"
+        ou["etape1"] = tr("« {a} » est réduite", a=app) if reduite else tr("« {a} » est derrière", a=app)
+        bouton = self.bouton_barre(hwnd)
+        if bouton:
+            return bouton, tr("d'abord : clique ici pour ramener « {w} » devant", w=app), self.rect_bouton, ou
+        return point, tr("la fenêtre « {w} » est derrière : ramène-la devant", w=app), zone, ou
+
+    def situer_dans_fenetre(self, c):
+        """--fenetre avec --element, --page ou rien (la barre de titre), et --onglet pour un navigateur."""
+        titre, element, onglet = c["fenetre"], c.get("element"), c.get("onglet")
+        seulement = None
+        if onglet:
+            o = self.trouver_onglet(titre, onglet)
+            if not o:
+                if not self.trouver_fenetres(titre) and not fenetres_reduites(titre):
+                    return None, tr("la fenêtre « {w} » n'est pas ouverte", w=titre), None, {}
+                return None, tr("je ne trouve pas l'onglet « {o} » dans « {w} »", o=onglet, w=titre), None, {}
+            rect_o, choisi, seulement = o
+            ou = {**self.ou_fenetre(seulement), "lieu": tr("onglet « {o} »", o=court(onglet, 30))}
+            centre_o = ((rect_o[0] + rect_o[2]) // 2, (rect_o[1] + rect_o[3]) // 2)
+            if user32.IsIconic(W.HWND(seulement)):
+                return self.devant_dabord(seulement, ou, centre_o, rect_o, reduite=True)
+            ok, cache = self.visible(centre_o, seulement, False)
+            if not ok:
+                if cache:
+                    ou["obstacle"] = dict(zip(("app", "exe"), app_de(cache)))
+                return self.devant_dabord(seulement, ou, centre_o, rect_o)
+            if not choisi:
+                # La page de la cible est dans un onglet caché : on montre l'onglet d'abord.
+                ou["etape1"] = tr("ouvre l'onglet « {o} »", o=court(onglet, 30))
+                ou["ecran"] = nom_ecran(self.ecrans, *centre_o)
+                return centre_o, tr("d'abord : ouvre l'onglet « {o} »", o=onglet), rect_o, ou
+        if c.get("page"):
+            hwnd = seulement or next(iter(self.trouver_fenetres(titre)), None)
+            vue = self.zone_de_page(hwnd) if hwnd else None
+            rect = None
+            if vue:
+                x, y, lg, ht = c["page"]
+                k = float(c.get("echelle") or 1.0)
+                rect = (int(vue[0] + x * k), int(vue[1] + y * k), int(vue[0] + (x + lg) * k), int(vue[1] + (y + ht) * k))
+            info = {"genre": "", "nom": c.get("element") or "",
+                    "hors": bool(rect and vue and (rect[1] >= vue[3] or rect[3] <= vue[1]))}
+        else:
+            rect, hwnd = self.trouver_element(titre, element, seulement)
+            info = self.infos_elements.get((titre, element, seulement)) or {}
+        if not hwnd:
+            reduites = fenetres_reduites(titre)
+            if reduites:
+                ou = self.ou_fenetre(reduites[0])
+                return self.devant_dabord(reduites[0], ou, None, None, reduite=True)
+            return None, tr("la fenêtre « {w} » n'est pas ouverte", w=titre), None, {}
+        ou = {**self.ou_fenetre(hwnd), **({"lieu": tr("onglet « {o} »", o=court(onglet, 30))} if onglet else {})}
+        if not ou.get("lieu"):
+            t = titre_de(hwnd)
+            debut = court(re.split(r" [-–] ", t)[0], 30)
+            if re.search(r" - (Google Chrome|Microsoft.? Edge|Brave|Mozilla Firefox)", t):
+                ou["lieu"] = tr("onglet « {o} »", o=debut)
+            elif debut.casefold() != (ou.get("app") or "").casefold():
+                ou["lieu"] = debut
+        if not rect:
+            if c.get("page"):
+                return None, tr("je ne trouve pas la page dans « {w} »", w=titre), None, ou
+            ou["proches"] = self.noms_proches(hwnd, element)
+            raison = tr("je ne trouve pas « {e} » dans « {w} »", e=element, w=titre)
+            if ou["proches"]:
+                raison += tr(" ; les noms proches : {n}", n=", ".join(f"« {x} »" for x in ou["proches"]))
+            elif not onglet and nom_de_classe(hwnd) == "Chrome_WidgetWin_1":
+                raison += tr(" ; si c'est dans un autre onglet, donne --onglet")
+            return None, raison, None, ou
+        nom = info.get("nom") or element or ""
+        if nom:
+            genre = info.get("genre") or ""
+            ou["element"] = f"{tr(genre)} « {court(nom, 30)} »" if genre else f"« {court(nom, 30)} »"
+        centre = ((rect[0] + rect[2]) // 2, (rect[1] + rect[3]) // 2)
+        zone = rect
+        if not element and not c.get("page"):
+            centre = ((rect[0] + rect[2]) // 2, rect[1] + 16)     # la barre de titre
+            zone = None
+        elif (rect[2] - rect[0]) > 2.5 * (rect[3] - rect[1]) and not c.get("page"):
+            centre = (rect[0] + 40, centre[1])                     # une ligne de liste : vers le nom, à gauche
+        if info.get("hors"):
+            # Hors de la vue (il faut défiler) : on pointe le bord de la fenêtre de ce côté, et la balise le dit.
+            l, t, r, b = self.zone_de_page(hwnd) or cadre_visible(hwnd)
+            ou["defiler"] = "↓" if centre[1] >= b - 4 else ("↑" if centre[1] <= t + 4 else "")
+            centre = (min(max(centre[0], l + 30), r - 30), min(max(centre[1], t + 30), b - 30))
+            zone = None
+        ok, cache = self.visible(centre, hwnd, False)
+        ou["ecran"] = nom_ecran(self.ecrans, *centre)
+        if ok:
+            return centre, "", zone, ou
+        if cache:
+            ou["obstacle"] = dict(zip(("app", "exe"), app_de(cache)))
+        # La fenêtre est derrière une autre : on montre d'abord son bouton dans la barre des tâches.
+        return self.devant_dabord(hwnd, ou, centre, zone)
+
+    def situer_point(self, c):
+        """--point X Y : on pointe là. La balise dit quelle app est sous le point ; avec --dans « Chrome », si une autre
+        fenêtre couvre le point, on ramène d'abord Chrome devant."""
+        point = tuple(c["point"])
+        h = user32.WindowFromPoint(W.POINT(int(point[0]), int(point[1])))
+        racine = user32.GetAncestor(h, GA_ROOT) if h else None
+        ou = {"ecran": nom_ecran(self.ecrans, *point)}
+        if racine:
+            ou.update(self.ou_fenetre(racine))
+        dans = c.get("dans")
+        if dans and racine:
+            voulues = self.trouver_fenetres(dans)
+            if racine not in voulues:
+                if voulues:
+                    ou_voulue = {**self.ou_fenetre(voulues[0]), "ecran": ou["ecran"],
+                                 "obstacle": {"app": ou.get("app"), "exe": ou.get("exe")}}
+                    return self.devant_dabord(voulues[0], ou_voulue, point, None)
+                reduites = fenetres_reduites(dans)
+                if reduites:
+                    return self.devant_dabord(reduites[0], self.ou_fenetre(reduites[0]), point, None, reduite=True)
+        return point, "", None, ou
+
+    def situer_icone(self, c, fenetres):
+        """--fichier : l'icône sur le Bureau ou dans un dossier ouvert de l'Explorateur."""
+        s = self.situer_fichier(c["fichier"], fenetres)
+        nom = os.path.basename(c["fichier"].rstrip("\\/"))
+        dossier = os.path.basename(os.path.dirname(c["fichier"].rstrip("\\/")))
+        rect = s.get("rect")
+        ou = {"element": f"« {court(nom, 30)} »"}
+        if rect:
             centre = ((rect[0] + rect[2]) // 2, (rect[1] + rect[3]) // 2)
-            zone = rect
-            if not c.get("element"):
-                centre = ((rect[0] + rect[2]) // 2, rect[1] + 16)     # la barre de titre
-                zone = None
-            elif (rect[2] - rect[0]) > 2.5 * (rect[3] - rect[1]):
-                centre = (rect[0] + 40, centre[1])                     # une ligne de liste : vers le nom, à gauche
-            ok, cache = self.visible(centre, hwnd, False)
-            if ok:
-                return centre, "", zone
-            # La fenêtre est derrière une autre : on montre d'abord son bouton dans la barre des tâches.
-            bouton = self.bouton_barre(hwnd)
-            if bouton:
-                return bouton, tr("d'abord : clique ici pour ramener « {w} » devant", w=c['fenetre']), None
-            return centre, tr("la fenêtre « {w} » est derrière : ramène-la devant", w=c['fenetre']), None
-        return None, "", None
+            ou["ecran"] = nom_ecran(self.ecrans, *centre)
+            h = user32.WindowFromPoint(W.POINT(*centre))
+            racine = user32.GetAncestor(h, GA_ROOT) if h else None
+            if s["mode"] == "pose" and racine:
+                if nom_de_classe(racine) in ("Progman", "WorkerW"):
+                    ou.update({"app": tr("Bureau"),
+                               "exe": os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "explorer.exe")})
+                else:
+                    ou.update({**self.ou_fenetre(racine), "lieu": court(dossier, 30)})
+            elif racine:
+                ou["obstacle"] = dict(zip(("app", "exe"), app_de(racine)))
+                ou["etape1"] = tr("« {f} » est caché", f=court(nom, 24))
+        if s["mode"] == "pose":
+            return s["centre"], "", rect, ou
+        if s["mode"] == "perche":
+            return (s["x"], s["y"] + 10), tr("c'est caché sous cette fenêtre"), None, ou
+        return None, tr("je ne vois pas {f} à l'écran", f=nom), None, ou
 
     def element_du_panneau(self, fenetre, element):
         """Un bouton du panneau des pigeons (ou de sa fenêtre des réglages), d'après la place que la volée publie :
@@ -1562,16 +1978,16 @@ class Guetteur(threading.Thread):
                 "projet": projet_de(s.chemin)}
         # Montrer un endroit à l'utilisateur passe avant tout le reste.
         if s.demande:
-            a, pa, za = self.situer_cible(s.demande.get("cible"), fenetres)
-            b, pb, zb = self.situer_cible(s.demande.get("vers"), fenetres)
-            c2, _p2, z2 = self.situer_cible(s.demande.get("puis"), fenetres)     # l'étape 2, s'il y en a une
+            a, pa, za, oa = self.situer_cible(s.demande.get("cible"), fenetres)
+            b, pb, zb, ob = self.situer_cible(s.demande.get("vers"), fenetres)
+            c2, _p2, z2, o2 = self.situer_cible(s.demande.get("puis"), fenetres)     # l'étape 2, s'il y en a une
             texte = s.demande.get("texte") or tr("Regarde ici")
             precision = " · ".join(p for p in (pa, pb) if p)
             importance = s.demande.get("importance") if s.demande.get("importance") in IMPORTANCES else "haute"
             etat["demande"] = {k: s.demande.get(k) for k in ("cible", "vers", "puis")}     # pour l'aide active
             return {**etat, "mode": "montre", "importance": importance, "cible": a, "vers": b, "zone": za, "zone_vers": zb,
                     "puis": c2, "zone_puis": z2, "texte_puis": s.demande.get("texte_puis") or "",
-                    "trouvee": a is not None, "precision": precision,
+                    "trouvee": a is not None, "precision": precision, "ou": oa, "ou_vers": ob, "ou_puis": o2,
                     "depuis": s.demande.get("heure", 0),
                     "bulle": texte + (f"\n({precision})" if precision else ""), "libelle": tr("te montre : ") + court(texte, 60)}
         # Une permission à donner (le crochet Notification) : la session est arrêtée tant que l'utilisateur n'a rien fait.
@@ -1693,6 +2109,14 @@ class Guetteur(threading.Thread):
         etats = {}
         # Une session fermée n'a plus de pigeon, de carte ni de ligne ; ses pigeonneaux partent avec elle.
         meres = sorted((s for s in self.sessions.values() if not s.parent and not s.est_fermee()), key=lambda s: s.rang)
+        # Ses livrables, eux, restent (l'utilisateur, 3 octobre, 18h29 : « j'aurai aimé cliqué sur le bouton pour copier le prompt ») :
+        # une session qui se termine elle-même (montre.py --termine) le fait juste avant sa dernière réponse, dont les
+        # liens, les fichiers et les blocs arrivent après. Ils restent dans le panneau 24 h, ou jusqu'à « Oublier ».
+        # Une session que l'utilisateur a terminée lui-même (le bouton) ne laisse rien : il a choisi qu'elle s'en aille.
+        self.livrables = [{"ident": s.ident, "titre": s.titre, "couleur": s.couleur, "sorties": list(s.sorties), "fermee": s.fermee}
+                          for s in sorted(self.sessions.values(), key=lambda s: -(s.fermee or 0))
+                          if not s.parent and s.fermee and s.fermee_par == "session" and s.est_fermee() and not s.archivee
+                          and s.sorties and not s.livrables_vus and maintenant - s.fermee < LIVRABLES_S][:4]
         for i, s in enumerate(meres):
             etats[s.ident] = self.placer(s, fenetres, maintenant, i)
         for s in self.sessions.values():
@@ -1705,6 +2129,8 @@ class Guetteur(threading.Thread):
         for e in actives:
             e["meme_dossier"] = [f["titre"] for f in actives if f is not e and f["projet"] == e["projet"]]
         self.calculer_conflits(maintenant)
+        if not self.actif:
+            return                              # remplacé pendant ce tour : l'autre guetteur écrit, pas lui
         self.ecrire_activite(maintenant, etats)
         self.ecarter(etats)
         with self.verrou:
@@ -2003,9 +2429,10 @@ user32.UpdateLayeredWindow.argtypes = [W.HWND, W.HDC, ctypes.POINTER(W.POINT), c
                                        ctypes.POINTER(W.POINT), W.COLORREF, ctypes.POINTER(_BLENDFUNCTION), W.DWORD]
 
 
-def couche_alpha(hwnd, image, x, y):
+def couche_alpha(hwnd, image, x, y, opacite=255):
     """Envoie une image RGBA (couleurs déjà multipliées par l'alpha) à une fenêtre en couches, en (x, y) :
-    chaque pixel garde sa propre transparence (UpdateLayeredWindow, ULW_ALPHA)."""
+    chaque pixel garde sa propre transparence (UpdateLayeredWindow, ULW_ALPHA). opacite (0 à 255) : une transparence
+    de plus pour toute l'image (le fondu de la balise, sans la redessiner)."""
     lg, ht = image.size
     ecran_dc = user32.GetDC(None)
     mem_dc = gdi32.CreateCompatibleDC(ecran_dc)
@@ -2018,7 +2445,7 @@ def couche_alpha(hwnd, image, x, y):
         donnees = image.tobytes("raw", "BGRA")
         ctypes.memmove(bits, donnees, len(donnees))
         ancien = gdi32.SelectObject(mem_dc, image_bmp)
-        melange = _BLENDFUNCTION(0, 0, 255, 1)                  # AC_SRC_OVER, alpha par pixel (AC_SRC_ALPHA)
+        melange = _BLENDFUNCTION(0, 0, max(0, min(255, int(opacite))), 1)   # AC_SRC_OVER, alpha par pixel
         user32.UpdateLayeredWindow(W.HWND(hwnd), ecran_dc, ctypes.byref(W.POINT(x, y)), ctypes.byref(W.SIZE(lg, ht)),
                                    mem_dc, ctypes.byref(W.POINT(0, 0)), 0, ctypes.byref(melange), 2)
         gdi32.SelectObject(mem_dc, ancien)
@@ -2282,6 +2709,317 @@ class Bulle:
         self.fen.destroy()
 
 
+# ---------------------------------------------------------------- la balise (5 octobre 2026)
+# L'idée de l'utilisateur (5 octobre 2026, 22h57) : « quand la ligne de guidage va jusqu'à la cible, une bulle qui mentionne où
+# exactement ; c'est souvent à la bonne position de l'écran mais il y a des fenêtres ouvertes par-dessus ; quelques mots
+# pour orienter : quelle couche, quelle app ; esthétique, en harmonie avec la ligne, des effets d'animation ».
+# Les maquettes : maquettes\maquette_balise.gif ; le plan : PLAN_BALISES_ET_FLUIDITE.md.
+# Le halo doux autour de la pastille reprend l'idée de Windows-MCP (github.com/CursorTouch/Windows-MCP, licence MIT,
+# control_overlay_art.py : la forme floutée, moins la forme) ; le code ici est écrit pour les pigeons.
+
+BALISE_K = 2                  # dessinée à 2x puis réduite : des bords lisses
+BALISE_MARGE = 28             # la balise laisse toujours libres la cible et 28 px autour
+BALISE_ENTREE_S = 0.20        # fondu et glissé de 10 px le long de la ligne, après le tracé de la ligne (250 ms)
+BALISE_SORTIE_S = 0.15
+ONDE_S = 0.45                 # l'onde qui part de l'encadré à l'arrivée, une seule fois
+AMBRE = (255, 176, 46)
+_POLICES, _ICONES = {}, {}
+
+
+def rvb(couleur):
+    couleur = couleur.lstrip("#")
+    return tuple(int(couleur[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def police_balise(taille, gras=False):
+    """Segoe UI Variable (la police de Windows 11), en demi-gras pour le nom de l'app ; Segoe UI sinon."""
+    cle = (taille, gras)
+    if cle not in _POLICES:
+        from PIL import ImageFont
+        polices = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
+        try:
+            f = ImageFont.truetype(str(polices / "SegUIVar.ttf"), taille)
+            try:
+                f.set_variation_by_name(b"Semibold Text" if gras else b"Regular")
+            except Exception:
+                pass
+        except OSError:
+            try:
+                f = ImageFont.truetype(str(polices / ("segoeuib.ttf" if gras else "segoeui.ttf")), taille)
+            except OSError:
+                f = ImageFont.load_default()
+        _POLICES[cle] = f
+    return _POLICES[cle]
+
+
+def icone_app(exe, taille):
+    """L'icône d'un programme en RGBA (ExtractIconEx, puis dessinée dans un bitmap 32 bits) ; None si on ne peut pas
+    (les apps du Windows Store refusent parfois). Gardée par programme."""
+    cle = (exe, taille)
+    if cle in _ICONES:
+        return _ICONES[cle]
+    im = None
+    if exe:
+        try:
+            import win32con
+            import win32gui
+            import win32ui
+            from PIL import Image
+            grandes, petites = win32gui.ExtractIconEx(exe, 0, 1)
+            if grandes or petites:
+                h = (grandes or petites)[0]
+                dc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+                mem = dc.CreateCompatibleDC()
+                bmp = win32ui.CreateBitmap()
+                bmp.CreateCompatibleBitmap(dc, 32, 32)
+                mem.SelectObject(bmp)
+                mem.FillSolidRect((0, 0, 32, 32), 0)
+                win32gui.DrawIconEx(mem.GetSafeHdc(), 0, 0, h, 32, 32, 0, None, win32con.DI_NORMAL)
+                im = Image.frombuffer("RGBA", (32, 32), bmp.GetBitmapBits(True), "raw", "BGRA", 0, 1).copy()
+                if im.getextrema()[3][1] == 0:
+                    im.putalpha(255)            # une vieille icône sans transparence
+                im = im.resize((taille, taille), Image.LANCZOS)
+                win32gui.DeleteObject(bmp.GetHandle())
+                mem.DeleteDC()
+                dc.DeleteDC()
+                for x in grandes + petites:
+                    win32gui.DestroyIcon(x)
+        except Exception as e:
+            log.info("icône de %s : %s", exe, e)
+            im = None
+    _ICONES[cle] = im
+    return im
+
+
+def image_de_balise(morceaux, puces, couleur, etape, fond, texte):
+    """La pastille : [numéro] [icône] App › endroit › élément [puces]. morceaux : [(exe, texte, gras)] ;
+    puces : [(exe, texte, genre)] où genre « alerte » (ambre : ce qui couvre la cible) ou « info ». Rend (image RGBA
+    aux couleurs déjà multipliées par l'alpha, demi-largeur du halo), en pixels de l'écran."""
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter
+    K = BALISE_K
+    terne = tuple(int(a + (b - a) * 0.45) for a, b in zip(texte, fond))      # entre le texte et le fond
+    f, fg, fp = police_balise(12 * K), police_balise(12 * K, True), police_balise(11 * K)
+    mesure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    px, ht = 10 * K, 28 * K
+    elems, x = [], px
+    if etape:
+        elems.append(("etape", x, str(etape)))
+        x += 21 * K
+    for i, (exe, t, gras) in enumerate(morceaux):
+        if i:
+            elems.append(("sep", x, None))
+            x += int(mesure.textlength(" › ", font=f))
+        ic = icone_app(exe, 18 * K) if exe else None
+        if ic is not None:
+            elems.append(("ic", x, ic))
+            x += ic.width + 5 * K
+        fo = fg if gras else f
+        elems.append(("txt", x, (t, fo)))
+        x += int(mesure.textlength(t, font=fo))
+    for exe, t, genre in puces:
+        x += 7 * K
+        ic = icone_app(exe, 14 * K) if exe else None
+        lg = int(mesure.textlength(t, font=fp)) + (ic.width + 4 * K if ic is not None else 0) + 14 * K
+        elems.append(("puce", x, (ic, t, lg, genre)))
+        x += lg
+    lg = x + px
+    halo = 14 * K
+    taille = (lg + 2 * halo, ht + 2 * halo)
+    forme = Image.new("L", taille, 0)
+    ImageDraw.Draw(forme).rounded_rectangle((halo, halo, halo + lg, halo + ht), radius=ht // 2, fill=255)
+    # Le halo : la forme floutée, moins la forme (comme Windows-MCP) ; de la couleur de la ligne.
+    aura = ImageChops.subtract(forme.filter(ImageFilter.GaussianBlur(7 * K)), forme).point(lambda a: min(255, int(a * 1.5)))
+    im = Image.new("RGBA", taille, couleur + (0,))
+    im.putalpha(aura)
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((halo, halo, halo + lg, halo + ht), radius=ht // 2, fill=fond + (240,),
+                        outline=couleur + (255,), width=int(1.5 * K))
+    cy = halo + ht // 2
+    for genre, ex, val in elems:
+        ex += halo
+        if genre == "etape":
+            d.ellipse((ex, cy - 8 * K, ex + 16 * K, cy + 8 * K), fill=couleur + (255,))
+            d.text((ex + 8 * K, cy), val, font=police_balise(10 * K, True), fill=(255, 255, 255), anchor="mm")
+        elif genre == "sep":
+            d.text((ex + 3 * K, cy), "›", font=f, fill=terne, anchor="lm")
+        elif genre == "ic":
+            im.alpha_composite(val, (ex, cy - val.height // 2))
+        elif genre == "txt":
+            t, fo = val
+            d.text((ex, cy), t, font=fo, fill=texte, anchor="lm")
+        else:
+            ic, t, lgp, g = val
+            teinte = AMBRE if g == "alerte" else couleur
+            # Des teintes opaques (le dessin remplace les pixels, il ne les mélange pas : une teinte transparente
+            # laissait voir le fond de l'écran à travers la puce).
+            d.rounded_rectangle((ex, cy - 10 * K, ex + lgp, cy + 10 * K), radius=10 * K,
+                                fill=tuple(int(f + (t - f) * 0.2) for f, t in zip(fond, teinte)) + (245,),
+                                outline=tuple(int(f + (t - f) * 0.85) for f, t in zip(fond, teinte)) + (255,), width=K)
+            xx = ex + 7 * K
+            if ic is not None:
+                im.alpha_composite(ic, (xx, cy - ic.height // 2))
+                xx += ic.width + 4 * K
+            clair = sum(fond) > 380
+            d.text((xx, cy), t, font=fp, anchor="lm",
+                   fill=(teinte if not clair else tuple(int(c * 0.55) for c in teinte)) if g != "alerte"
+                   else ((150, 85, 0) if clair else (255, 214, 150)))
+    im = im.resize((taille[0] // K, taille[1] // K), Image.LANCZOS)
+    # Les couleurs multipliées par l'alpha, comme le veut UpdateLayeredWindow.
+    im = Image.frombytes("RGBA", im.size, im.convert("RGBa").tobytes())
+    return im, halo // K
+
+
+def image_d_onde(zone, couleur, u, arrondi=8):
+    """L'onde d'arrivée : un anneau qui part de l'encadré, s'élargit de 16 px et s'efface (u de 0 à 1)."""
+    from PIL import Image, ImageDraw
+    K, pad = 2, 22
+    l, t, r, b = zone
+    lg, ht = int(r - l) + 2 * pad, int(b - t) + 2 * pad
+    im = Image.new("RGBA", (lg * K, ht * K), couleur + (0,))
+    d = ImageDraw.Draw(im)
+    m = 2 + 16 * (1 - (1 - u) ** 3)
+    a = int(190 * (1 - u))
+    d.rounded_rectangle(((pad - m) * K, (pad - m) * K, (lg - pad + m) * K, (ht - pad + m) * K),
+                        radius=int((arrondi + m) * K), outline=couleur + (a,), width=2 * K)
+    im = im.resize((lg, ht), Image.LANCZOS)
+    return Image.frombytes("RGBA", im.size, im.convert("RGBa").tobytes()), (int(l) - pad, int(t) - pad)
+
+
+def place_sur_ligne(lg, ht, de, a, zone, eviter, ecrans):
+    """Le centre de la balise SUR la ligne de « de » (la souris, ou l'étape 1) à « a » (la cible) : on part de la
+    cible et on recule de 4 px en 4 px jusqu'à ce qu'elle ne touche ni la cible et ses alentours (BALISE_MARGE), ni les
+    zones à éviter (l'autre cible), et qu'elle tienne dans un écran, hors de la barre des tâches. L'idée vient de
+    « flip / shift / hide » de Floating UI (licence MIT), mais le long de la ligne. None : pas de place (la souris est
+    déjà tout près, ou la ligne est trop courte) ; la balise s'efface."""
+    (x0, y0), (x1, y1) = de, a
+    long = math.hypot(x1 - x0, y1 - y0)
+    if long < 1:
+        return None
+    ux, uy = (x1 - x0) / long, (y1 - y0) / long
+    m = BALISE_MARGE
+    zones = [(zone[0] - m, zone[1] - m, zone[2] + m, zone[3] + m)] + [z for z in eviter if z]
+    for recul in range(40, int(long) - 40, 4):
+        cx, cy = x1 - ux * recul, y1 - uy * recul
+        r = (cx - lg / 2, cy - ht / 2, cx + lg / 2, cy + ht / 2)
+        if any(r[0] < z[2] and r[2] > z[0] and r[1] < z[3] and r[3] > z[1] for z in zones):
+            continue
+        e = ecran_de(ecrans, int(cx), int(cy))
+        if e and e["travail"][0] + 4 <= r[0] and r[2] <= e["travail"][2] - 4 and e["travail"][1] + 4 <= r[1] \
+                and r[3] <= e["travail"][3] - 4:
+            return cx, cy
+    return None
+
+
+class Balise:
+    """Une balise à l'écran : une fenêtre en couches (comme les lignes), qui traverse les clics. Elle entre en
+    fondu en glissant de 10 px le long de la ligne vers la cible, après le tracé de la ligne ; l'encadré lance une
+    onde, une fois ; puis plus rien ne bouge. Elle sort
+    en fondu (150 ms). Animations de Windows coupées : un fondu seulement."""
+
+    def __init__(self, racine):
+        import tkinter as tk
+        self.fens = []
+        for _ in range(2):                    # la pastille, et l'onde autour de l'encadré
+            f = tk.Toplevel(racine)
+            f.overrideredirect(True)
+            f.geometry("1x1+-3000+-3000")
+            f.attributes("-topmost", True)
+            f.update_idletasks()
+            h = user32.GetParent(f.winfo_id())
+            ex = user32.GetWindowLongW(W.HWND(h), GWL_EXSTYLE)
+            user32.SetWindowLongW(W.HWND(h), GWL_EXSTYLE,
+                                  ex | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
+            self.fens.append((f, h))
+        self.hwnd, self.hwnd_onde = self.fens[0][1], self.fens[1][1]
+        self.contenu, self.image, self.halo = None, None, 0
+        self.nee, self.partie = None, None
+        self.xy, self.vise, self.dir = None, None, (1.0, 0.0)
+        self.dernier = None                   # (x, y, opacité) envoyés : on ne renvoie que si ça change
+        self.onde_finie = False
+
+    def taille(self):
+        """La taille de la pastille sans son halo (pour la placer)."""
+        lg, ht = self.image.size
+        return lg - 2 * self.halo, ht - 2 * self.halo
+
+    def peindre(self, contenu, couleur, fond, texte):
+        """Redessine la pastille si ce qu'elle dit, sa couleur ou le thème ont changé (sinon rien : elle est gardée)."""
+        cle = (contenu, couleur, fond, texte)
+        if cle != self.contenu:
+            morceaux, puces, etape = contenu
+            self.image, self.halo = image_de_balise(morceaux, puces, couleur, etape, fond, texte)
+            self.contenu, self.dernier = cle, None
+
+    def rect(self):
+        """La place de la pastille (sans halo) à son arrivée : les points de la ligne s'arrêtent là."""
+        if not self.vise or not self.image:
+            return None
+        lg, ht = self.taille()
+        return (self.vise[0] - lg / 2, self.vise[1] - ht / 2, self.vise[0] + lg / 2, self.vise[1] + ht / 2)
+
+    def poser(self, centre, direction, maintenant, depart, bouge, zone_onde=None, couleur=None, respire=False):
+        """centre : où elle doit être (sur la ligne) ; direction : celle de la ligne vers la cible ; depart : l'heure où
+        la ligne est apparue (la balise entre après son tracé)."""
+        if self.partie is not None:
+            self.partie = None                # elle revient avant d'être partie
+        if self.nee is None:
+            self.nee = max(maintenant, depart + (TRACE_S if bouge else 0))
+        self.vise, self.dir = centre, direction
+        if self.xy is None:
+            self.xy = list(centre)
+        else:                                 # elle suit la ligne en douceur quand la souris bouge
+            k = 0.35
+            self.xy[0] += (centre[0] - self.xy[0]) * k
+            self.xy[1] += (centre[1] - self.xy[1]) * k
+        u = (maintenant - self.nee) / BALISE_ENTREE_S
+        if u <= 0:
+            self.envoyer(0, 0, 0)
+            return
+        u = min(1.0, u)
+        douce = 1 - (1 - u) ** 3
+        recul = 10 * (1 - douce) if bouge else 0          # le glissé : de 10 px en arrière jusqu'à sa place
+        x, y = self.xy[0] - direction[0] * recul, self.xy[1] - direction[1] * recul
+        opacite = 255 * douce
+        if respire and u >= 1 and bouge:
+            opacite *= 0.86 + 0.14 * (1 + math.cos(2 * math.pi * (maintenant - self.nee) / 3.0)) / 2
+        self.envoyer(x, y, opacite)
+        # L'onde d'arrivée, une fois, autour de l'encadré de la cible.
+        if zone_onde and bouge and not self.onde_finie:
+            v = (maintenant - self.nee) / ONDE_S
+            if 0 <= v < 1:
+                im, (ox, oy) = image_d_onde(zone_onde, couleur, v)
+                couche_alpha(self.hwnd_onde, im, ox, oy)
+            elif v >= 1:
+                self.onde_finie = True
+                user32.SetWindowPos(W.HWND(self.hwnd_onde), None, -3000, -3000, 1, 1, SWP_NOZORDER | SWP_NOACTIVATE)
+
+    def envoyer(self, x, y, opacite):
+        lg, ht = self.image.size
+        pos = (int(x - lg / 2), int(y - ht / 2), int(opacite))
+        if pos != self.dernier:
+            couche_alpha(self.hwnd, self.image, pos[0], pos[1], pos[2])
+            self.dernier = pos
+
+    def partir(self, maintenant):
+        """Le geste est fait, ou la balise n'a plus de place : elle s'efface en 150 ms. Rend vrai quand c'est fini."""
+        if self.image is None or self.nee is None or self.xy is None:
+            return True
+        if self.partie is None:
+            self.partie = maintenant
+            self.depart_opacite = (self.dernier or (0, 0, 0))[2]
+        u = (maintenant - self.partie) / BALISE_SORTIE_S
+        if u >= 1:
+            self.envoyer(-3000, -3000, 0)
+            self.nee, self.xy, self.onde_finie = None, None, False
+            return True
+        self.envoyer(self.xy[0], self.xy[1], self.depart_opacite * (1 - u))
+        return False
+
+    def detruire(self):
+        for f, _h in self.fens:
+            f.destroy()
+
+
 def dans_zone(x, y, zone, point, rayon=30):
     """Un clic tombe-t-il sur l'endroit montré ? Dans sa zone (un peu élargie), ou près du point."""
     if zone and zone[0] - 6 <= x <= zone[2] + 6 and zone[1] - 6 <= y <= zone[3] + 6:
@@ -2336,6 +3074,33 @@ def cliquer(x, y):
     user32.mouse_event(0x2, 0, 0, 0, 0)
     user32.mouse_event(0x4, 0, 0, 0, 0)
     user32.SetCursorPos(pt.x, pt.y)
+
+
+class Vigie(threading.Thread):
+    """Le garde-fou de l'affichage (5 octobre 2026, 22h39 : le fil de Tk a gelé pendant la mise à jour de l'app Claude,
+    Windows a fermé le programme, et le journal n'en a rien dit). Un fil à part regarde l'heure de la dernière image :
+    sans image depuis 5 s, la pile de l'affichage va dans le journal (où il bloque), et encore à 30 s ; quand il repart,
+    le journal dit combien de temps il a gelé. Elle ne relance rien : montre.py et annonce.py le font, de l'extérieur."""
+
+    def __init__(self, volee):
+        super().__init__(daemon=True, name="vigie")
+        self.volee = volee
+
+    def run(self):
+        import traceback
+        debut, piles = None, 0
+        while True:
+            time.sleep(1.0)
+            fige = time.time() - self.volee.t_prec
+            if fige > AFFICHAGE_FIGE_S and (piles == 0 or (piles == 1 and fige > 30)):
+                debut = debut or self.volee.t_prec
+                piles += 1
+                cadre = sys._current_frames().get(threading.main_thread().ident)
+                pile = "".join(traceback.format_stack(cadre)) if cadre else "(pile introuvable)"
+                log.error("l'affichage est figé depuis %d s ; il en est là :\n%s", fige, pile)
+            elif fige < 1 and debut:
+                log.warning("l'affichage repart après %d s de gel", time.time() - debut)
+                debut, piles = None, 0
 
 
 class Raccourci(threading.Thread):
@@ -2558,7 +3323,7 @@ class Panneau:
         self.b_masquer = self.bouton(pied, "Masquer les guides", self.masquer,
                                      aide="Cache les lignes, les flèches, les encadrés et les étiquettes ; le panneau reste.", dessus=True)
         self.b_reglages = self.bouton(pied, "Réglages", volee.ouvrir_reglages, aide="Ouvre les réglages.", dessus=True)
-        self.b_arreter = self.bouton(pied, "Arrêter", r.destroy, danger=True, cote="right",
+        self.b_arreter = self.bouton(pied, "Arrêter", volee.arreter, danger=True, cote="right",
                                      aide="Arrête les pigeons. Le ✕ de la fenêtre, lui, la réduit seulement.", dessus=True)
         self.signature = None
         self.place = False
@@ -2738,7 +3503,9 @@ class Panneau:
         annulable = getattr(v, "annulable", None)
         annulable = annulable if annulable and maintenant - annulable[2] < 5 else None
         conflits = list(getattr(v.guetteur, "conflits", []))[:3]
+        livrables = list(getattr(v.guetteur, "livrables", []))
         signature = (annulable and annulable[0], tuple((f, tuple(q)) for f, q in conflits),
+                     tuple((l["ident"], tuple(x["valeur"] for x in l["sorties"])) for l in livrables),
                      tuple((e["ident"], e["eff"], e["titre"], court(e["bulle"], 90), e["couleur"], e.get("importance"),
                             v.couleur_guide(e), int((maintenant - e["depuis"]) // 60) if e["depuis"] else 0,
                             int(((v.en_pause.get(e["ident"]) or maintenant) - maintenant) // 60),
@@ -2773,6 +3540,10 @@ class Panneau:
                      font=("Segoe UI", 9, "italic"), anchor="w").pack(fill="x", padx=6, pady=(0, 6))
         for e in a_faire:
             self.carte(e)
+        if livrables:
+            self.titre_section("Livrables des sessions finies", len(livrables))
+            for l in livrables:
+                self.carte_livrables(l)
         if travail:
             self.titre_section("Au travail", len(travail))
             for e in travail:
@@ -2835,13 +3606,37 @@ class Panneau:
         self.bouton(boutons, "Terminer", lambda: v.terminer(i), petit=True, cote="right",
                     aide="La session est finie : sa carte, sa ligne et son pigeon s'en vont. Elle revient si tu lui écris.")
 
+    def carte_livrables(self, l):
+        """Ce qu'une session terminée a laissé (sa dernière réponse) : ses liens, ses fichiers et ses blocs, avec Copier,
+        Ouvrir, Montrer ; « Oublier » les retire du panneau. Ni pigeon, ni ligne, ni guidage : la session est finie."""
+        tk, v = self.tk, self.v
+        c = tk.Frame(self.corps, bg=self.CARTE)
+        c.pack(fill="x", padx=4, pady=3)
+        tk.Frame(c, bg=l["couleur"] or "#888888", width=4).pack(side="left", fill="y")
+        texte = tk.Frame(c, bg=self.CARTE)
+        texte.pack(side="left", fill="x", expand=True, padx=10, pady=6)
+        haut = tk.Frame(texte, bg=self.CARTE)
+        haut.pack(fill="x")
+        tk.Label(haut, text=l["titre"][:40], bg=self.CARTE, fg=self.TEXTE, font=("Segoe UI Semibold", 10),
+                 anchor="w").pack(side="left")
+        tk.Label(haut, text=tr("terminée ") + depuis_lisible(time.time() - l["fermee"]), bg=self.CARTE, fg=self.PALE,
+                 font=("Segoe UI", 8)).pack(side="left", padx=8)
+        self.bouton(haut, "Oublier", lambda i=l["ident"]: v.oublier_livrables(i), petit=True, cote="right",
+                    aide="Ces livrables s'en vont du panneau (la session reste terminée).")
+        for item in l["sorties"][:6]:
+            self.sortie(texte, item)
+
     def sortie(self, parent, item):
-        """Un lien ou un fichier cité par la session : son nom, et Copier, Ouvrir, Montrer (dans l'Explorateur).
-        Copier met l'adresse ou le chemin complet dans le presse-papiers, d'un clic de l'utilisateur."""
+        """Un lien, un fichier ou un bloc de texte cité par la session : son nom, et Copier, Ouvrir, Montrer (dans
+        l'Explorateur). Copier met l'adresse, le chemin complet ou le texte entier du bloc dans le presse-papiers,
+        d'un clic de l'utilisateur ; un bloc n'a que Copier."""
         tk = self.tk
         l = tk.Frame(parent, bg=self.CARTE)
         l.pack(fill="x", pady=(2, 0))
-        icone = tr("lien" if item["genre"] == "lien" else ("dossier" if os.path.isdir(item["valeur"]) else "fichier"))
+        if item["genre"] == "texte":
+            icone = tr("texte")
+        else:
+            icone = tr("lien" if item["genre"] == "lien" else ("dossier" if os.path.isdir(item["valeur"]) else "fichier"))
         tk.Label(l, text=f"{icone} · {court(item['nom'], 38)}", bg=self.CARTE, fg=self.ACCENT, font=("Segoe UI", 8),
                  anchor="w").pack(side="left")
 
@@ -2861,6 +3656,9 @@ class Panneau:
             import subprocess
             subprocess.Popen(["explorer", "/select,", valeur])
 
+        if item["genre"] == "texte":
+            self.bouton(l, "Copier", copier, petit=True, cote="right", aide="Copie le texte du bloc (un prompt, une commande).")
+            return
         if item["genre"] == "fichier":
             self.bouton(l, "Montrer", montrer, petit=True, cote="right", aide="Montre le fichier dans l'Explorateur.")
         self.bouton(l, "Ouvrir", ouvrir, petit=True, cote="right", aide="Ouvre le lien ou le fichier.")
@@ -2974,6 +3772,8 @@ class Volee:
         self.ecran_parc = next((e for e in self.ecrans if e["principal"]), self.ecrans[0])
         self.partage, self.verrou = {}, threading.Lock()
         self.racine = tk.Tk()
+        # Une erreur dans un rappel de Tk va au journal (sous pythonw, Tk l'écrirait dans une sortie qui n'existe pas).
+        self.racine.report_callback_exception = lambda *e: log.error("rappel de Tk", exc_info=e)
         self.reglages = charger_reglages()
         self._palette = palette(self.reglages)
         Panneau.appliquer_palette(self._palette)
@@ -2988,6 +3788,9 @@ class Volee:
         self.etiquettes = {}        # ident -> Bulle à côté de cet encadré (réglage « infos à l'écran »)
         self.etiquettes_lien = {}   # ident -> [Bulle] : « 1 · prends ceci », « 2 · dépose ici » (deux cibles liées)
         self.cadres_travail = {}    # ident -> Cadre autour du fichier exact où travaille la session
+        self.cadres_seuls = {}      # ident -> (Cadre, Bulle) : où elle travaille, quand les pigeons sont cachés
+        self.balises = {}           # (ident, "a" ou "b") -> Balise : où est exactement la cible (5 octobre 2026)
+        self.trous = []             # les places des balises : les points des lignes s'arrêtent là
         self.guetteur = Guetteur(self.partage, self.verrou, self.ecrans)
         self.guetteur.start()
         self.oiseaux, self.bulles, self.fleches = {}, {}, {}   # ident -> Oiseau, Bulle, (Fleche, Fleche|None)
@@ -3012,8 +3815,13 @@ class Volee:
         self.bouton_avant = False
         self.appui_sur_a = set()
         self.t_prec = time.time()
+        self.t_relance_guetteur = 0.0
+        self.t_battement = 0.0
+        ARRET.unlink(missing_ok=True)       # lancés : l'utilisateur (ou une relance sûre) les veut en marche
+        Vigie(self).start()
         self.racine.after(33, self.image)
         self.racine.after(1000, self.rafraichir_panneau)
+        self.racine.after(10000, self.veiller_guetteur)
 
     def parc(self, i, sous_agent):
         """Les places DANS la barre des tâches, sous la fenêtre de Claude, dans son espace vide (trouver_parc) :
@@ -3099,6 +3907,23 @@ class Volee:
         self.annulable = (ident, e["titre"] if e else ident[:8], maintenant)
         self.panneau.signature = None               # le bandeau « Annuler » tout de suite
         log.info("session terminée par l'utilisateur : %s", e["titre"] if e else ident)
+
+    def oublier_livrables(self, ident):
+        """« Oublier » sur les livrables d'une session terminée : ils quittent le panneau. Retenu dans sa fermeture
+        (fermetures\\<session>.json), pour survivre à une relance ; la session, elle, reste terminée."""
+        f = FERMETURES / f"{ident}.json"
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            d["livrables_vus"] = True
+            provisoire = f.with_suffix(".tmp")
+            provisoire.write_text(json.dumps(d), encoding="utf-8")
+            os.replace(provisoire, f)               # jamais un fichier à moitié écrit
+        except (OSError, ValueError) as ex:
+            log.warning("oublier les livrables de %s : %s", ident, ex)
+            return
+        self.guetteur.livrables = [l for l in self.guetteur.livrables if l["ident"] != ident]
+        self.panneau.signature = None
+        log.info("livrables oubliés : %s", ident)
 
     def annuler_fermeture(self):
         """« Annuler » : la session revient comme avant."""
@@ -3216,6 +4041,7 @@ class Volee:
                 self.terminer_premiere()
         self.lignes = []            # les pointillés à tracer cette image (réglage « lignes »)
         sessions_la = {e["ident"] for e in etats}
+        self.montrer_ou_elles_travaillent(etats)   # avant le tri des pigeons : ces encadrés ne dépendent pas d'eux
         if self.masques:            # le bouton « Masquer les pigeons » du panneau
             etats = []
         elif not self.reglages["pigeons_au_travail"]:
@@ -3292,10 +4118,15 @@ class Volee:
             elif eff == "appel" and appel_recent is not None and ident == appel_recent["ident"] \
                     and maintenant - debut_appel < 8:
                 texte = ligne                                  # 8 s, puis seulement le pigeon et son anneau
+            # Pas de bulle à côté de la cible, sauf si l'utilisateur la veut (le réglage « bulle_cible », 3 octobre 23h36 : elle
+            # cachait trop souvent la cible et ses alentours) ; la consigne reste dans le panneau ; le survol d'un pigeon
+            # affiché la montre encore.
+            pres_cible = eff == "montre" and e["cible"] and (not e["vers"] or not visible)
+            if texte and pres_cible and not survol and not self.reglages["bulle_cible"]:
+                texte = None
             if texte:
                 # À droite de l'encadré de la cible ; pour un glisser, à côté du pigeon s'il est affiché, sinon de A.
-                zone = (zone_ou_carre(e.get("zone"), e["cible"]) if eff == "montre" and e["cible"]
-                        and (not e["vers"] or not visible) else None)
+                zone = zone_ou_carre(e.get("zone"), e["cible"]) if pres_cible else None
                 autres = [zone_ou_carre(e.get(cz), e[cp]) for cp, cz in (("puis", "zone_puis"), ("vers", "zone_vers"))
                           if eff == "montre" and e.get(cp)]
                 self.bulles[ident].montrer(p[0], p[1] - arc, texte, couleur, self.ecrans, zone,
@@ -3308,6 +4139,7 @@ class Volee:
                 montre_recente = e
         self.guider(montre_recente, cx, cy)
         self.guider_attente(etats, cx, cy, maintenant)   # avec la flèche d'une demande, s'il y en a une
+        self.baliser(etats, cx, cy, maintenant)
         self.tracer_lignes(cx, cy, maintenant)
         for ident in list(self.oiseaux):
             if ident not in vivants:            # la session est partie (ou son pigeon est masqué)
@@ -3326,7 +4158,59 @@ class Volee:
         for ident in list(self.etats):
             if ident not in sessions_la:
                 self.etats.pop(ident, None)
+        if maintenant - self.t_battement > 2:
+            # Le battement de l'affichage, pour montre.py et annonce.py : un fichier vieux de 30 s dit qu'il est figé.
+            self.t_battement = maintenant
+            try:
+                AFFICHAGE.write_text(str(os.getpid()), encoding="utf-8")
+            except OSError:
+                pass
         self.racine.after(33, self.image)
+
+    def arreter(self):
+        """Le bouton « Arrêter » : un mot dans arret_volontaire.json (montre.py et annonce.py ne relancent pas des
+        pigeons que l'utilisateur a arrêtés lui-même), puis la fin du programme."""
+        try:
+            ARRET.write_text(json.dumps({"heure": time.time(), "heure_lisible": datetime.now().strftime("%Y-%m-%d %H:%M")}),
+                             encoding="utf-8")
+            AFFICHAGE.unlink(missing_ok=True)
+        except OSError:
+            log.exception("mot d'arrêt")
+        self.racine.destroy()
+
+    def montrer_ou_elles_travaillent(self, etats):
+        """Sans pigeons, où chaque IA travaille reste visible (l'utilisateur, 3 octobre, 18h3x : en cachant les pigeons vers 09h10,
+        « on a pas gardé les cibles, les encadrés où les IA travaillent » ; son choix : « Encadré + nom de la session »).
+        Un encadré pointillé de la couleur de la session autour du fichier ou du dossier qu'elle touche, s'il se voit à
+        l'écran (« pose » : le Bureau, un Explorateur ouvert ; caché sous une fenêtre, rien, la règle de 12h54), et son nom
+        dans une étiquette. Ni ligne ni pigeon. Les pigeons visibles, c'est montrer_travail qui s'en charge."""
+        rg = self.reglages
+        voulus = {}
+        if not rg["afficher_pigeons"] and rg.get("encadres_travail", True) and not self.masques:
+            voulus = {e["ident"]: e for e in etats if not e["parent"] and e["eff"] == "pose" and e.get("zone_travail")}
+        for ident in list(self.cadres_seuls):
+            if ident not in voulus:
+                for x in self.cadres_seuls.pop(ident):
+                    x.detruire()
+        # Deux sessions au même endroit (l'utilisateur, 19h09:36 : « quand 2 sessions travaillent en même temps les noms se
+        # chevauchent ») : les encadrés s'emboîtent (3 px de plus chacun) et chaque nom évite les noms déjà posés
+        # (à droite, au-dessus, en dessous, puis à gauche : Bulle.montrer).
+        par_zone, poses = {}, []
+        for ident, e in sorted(voulus.items()):
+            couleur = self.couleur_guide(e)
+            cadre, etiquette = self.cadres_seuls.get(ident, (None, None))
+            if cadre is None or cadre.couleur != couleur:
+                if cadre:
+                    cadre.detruire()
+                    etiquette.detruire()
+                cadre, etiquette = self.cadres_seuls[ident] = (Cadre(self.racine, couleur), Bulle(self.racine))
+            zone = tuple(e["zone_travail"])
+            rang = par_zone[zone] = par_zone.get(zone, -1) + 1
+            cadre.entourer(zone, min(0, rg["encadres_marge"]) - 1 + 3 * rang, 1, "pointilles", None, rg["encadres_arrondi"])
+            etiquette.montrer(zone[2], zone[1], court(e["titre"], 40), couleur, self.ecrans, zone, rg["opacite_bulles"],
+                              eviter=poses)
+            if etiquette.rect():
+                poses.append(etiquette.rect())
 
     def montrer_travail(self, e, couleur, survol, depuis):
         """Le pigeon au travail : une ligne pointillée de lui jusqu'au fichier ou au sous-dossier exact où travaille
@@ -3434,6 +4318,94 @@ class Volee:
         if not bulles:
             self.etiquettes_lien.pop(ident, None)
 
+    def contenu_balise(self, e, ou, etape, suite=False):
+        """Ce que dit une balise : (morceaux, puces, numéro). Les morceaux font un fil d'Ariane, « [icône] Chrome ›
+        onglet « Gemini » › bouton « Envoyer » » ; une étape d'avant (la fenêtre derrière, réduite, l'onglet caché) dit
+        ce qu'il faut faire d'abord ; les puces disent ce qui couvre la cible (en ambre), qu'il faut défiler, ou
+        l'écran quand ce n'est pas celui de la souris."""
+        complet = self.reglages["balise_detail"] == "complet"
+        morceaux, puces = [], []
+        if ou.get("etape1"):
+            morceaux.append((ou.get("exe"), ou["etape1"], True))
+            obstacle = ou.get("obstacle") or {}
+            if obstacle.get("app"):
+                puces.append((obstacle.get("exe"), tr("sous « {a} »", a=obstacle["app"]), "alerte"))
+        else:
+            if ou.get("app") and not suite:
+                morceaux.append((ou.get("exe"), ou["app"], True))
+            if ou.get("lieu") and (complet or not ou.get("element")) and not suite:
+                morceaux.append((None, ou["lieu"], False))
+            if ou.get("element"):
+                morceaux.append((None if morceaux else ou.get("exe"), ou["element"], not morceaux))
+        if not morceaux:
+            texte = (e.get("texte_puis") if suite else "") or e.get("bulle") or tr("Regarde ici")
+            morceaux.append((None, court(texte.split("\n")[0], 40), True))
+        if ou.get("defiler"):
+            puces.append((None, tr("fais défiler {d}", d=ou["defiler"]), "info"))
+        cible = e.get("puis") if suite else e.get("cible")
+        cx, cy = self.curseur()
+        if cible and ou.get("ecran") and ecran_de(self.ecrans, cx, cy) is not ecran_de(self.ecrans, *cible):
+            puces.append((None, ou["ecran"], "info"))
+        return tuple(morceaux), tuple(puces), etape
+
+    def baliser(self, etats, cx, cy, maintenant):
+        """Les balises (l'utilisateur, 5 octobre 2026) : sur la ligne de chaque demande qui montre, la bulle qui dit où est
+        exactement la cible (l'app, l'onglet, l'élément, ce qui la couvre). Une deuxième balise sur le lien vers
+        l'étape 2 (ou le point de dépose d'un glisser). Une balise qui n'a pas de place sur sa ligne s'efface : la
+        souris est déjà tout près de la cible."""
+        rg, voulues = self.reglages, {}
+        if rg["balise"]:
+            for e in etats:
+                if e.get("eff") != "montre" or not e.get("cible"):
+                    continue
+                couleur = rvb(self.couleur_guide(e))
+                ou = e.get("ou") or {}
+                if e.get("etape") == 2:
+                    ou = e.get("ou_puis") or {}
+                suite = e.get("puis") or e.get("vers")
+                zone_a = zone_ou_carre(e.get("zone"), e["cible"], 12)
+                zone_b = zone_ou_carre(e.get("zone_puis") or e.get("zone_vers"), suite, 12) if suite else None
+                etape = e.get("etape") or (1 if (ou.get("etape1") or suite) else None)
+                voulues[(e["ident"], "a")] = (self.contenu_balise(e, ou, etape), couleur, (cx, cy), tuple(e["cible"]),
+                                              zone_a, [zone_b], maintenant)
+                if suite:
+                    ou_b = (e.get("ou_puis") if e.get("puis") else e.get("ou_vers")) or {}
+                    if e.get("vers") and not ou_b.get("etape1"):
+                        ou_b = {**ou_b, "element": tr("dépose ici") + (" › " + ou_b["element"] if ou_b.get("element") else "")}
+                    voulues[(e["ident"], "b")] = (self.contenu_balise(e, ou_b, 2, suite=True), couleur, tuple(e["cible"]),
+                                                  tuple(suite), zone_b, [zone_a], maintenant)
+        bouge = self.animations_windows()
+        fond, texte = rvb(Panneau.BULLE_FOND), rvb(Panneau.BULLE_TEXTE)
+        self.trous = []
+        poses = []
+        for cle, (contenu, couleur, de, a, zone, eviter, depuis) in voulues.items():
+            b = self.balises.get(cle)
+            if b is None:
+                b = self.balises[cle] = Balise(self.racine)
+            b.peindre(contenu, couleur, fond, texte)
+            lg, ht = b.taille()
+            centre = place_sur_ligne(lg, ht, de, a, zone, list(eviter) + poses, self.ecrans)
+            if centre is None:
+                b.partir(maintenant)
+                continue
+            long = math.hypot(a[0] - de[0], a[1] - de[1]) or 1
+            b.poser(centre, ((a[0] - de[0]) / long, (a[1] - de[1]) / long), maintenant,
+                    self.lignes_nees_de(a, depuis), bouge, zone if cle[1] == "a" else None, couleur, rg["balise_respire"])
+            r = b.rect()
+            if r:
+                self.trous.append(r)
+                poses.append(r)
+        for cle in list(self.balises):
+            if cle not in voulues and self.balises[cle].partir(maintenant):
+                self.balises.pop(cle).detruire()           # le geste est fait : fondu de sortie, puis plus rien
+
+    def lignes_nees_de(self, but, defaut):
+        """L'heure où la ligne vers ce but est apparue (la balise entre après son tracé) ; sinon « defaut »."""
+        for nom, t in self.lignes_nees.items():
+            if round(but[0] / 150) == nom[3] and round(but[1] / 150) == nom[4]:
+                return t
+        return defaut
+
     def ranger_fleches(self, ident):
         for f in self.fleches.pop(ident, ())[:5]:
             if f:
@@ -3477,7 +4449,8 @@ class Volee:
                    rg["lignes_fondu_debut"], rg["lignes_fondu_fin"], rg["lignes_forme"], rg["lignes_courbure"],
                    trace, animation, rg["lignes_vitesse"])
         cle = (cx, cy, tuple((round(x), round(y), c, de and (round(de[0]), round(de[1])), suite)
-                             for x, y, c, de, suite in self.lignes), reglage)
+                             for x, y, c, de, suite in self.lignes), reglage,
+               tuple(tuple(int(v) for v in t) for t in self.trous))
         # Une ligne qui se dessine (250 ms) ou une animation continue : on redessine même si rien n'a bougé, jusqu'à
         # ce que chaque ligne ait été dessinée EN ENTIER une fois (mesuré le 2 octobre : créer les toiles prend
         # 0,45 s ; la ligne finissait son tracé sans avoir été dessinée, et restait invisible).
@@ -3528,6 +4501,9 @@ class Volee:
             if nom not in vues:
                 del self.lignes_nees[nom]
                 self.lignes_tracees.discard(nom)
+        if self.trous:                                   # sous une balise, la ligne s'interrompt et reprend après
+            morceaux = [m for m in morceaux
+                        if not any(t[0] - 5 <= m[0] <= t[2] + 5 and t[1] - 5 <= m[1] <= t[3] + 5 for t in self.trous)]
         for v in self.voiles:
             v.dessiner([m for m in morceaux if v.contient(m[0], m[1])], rg["lignes_style"], rg["lignes_epaisseur"],
                        rg["lignes_opacite_depart"], rg["lignes_opacite_arrivee"], rg["lignes_fondu_debut"],
@@ -3594,7 +4570,12 @@ class Volee:
         voulues = []
         if self.reglages["fleche_attente"]:
             for e in guidees:
-                but = e.get("reponse") or (tuple(self.pos[e["ident"]]) if e["ident"] in self.pos else None)
+                # Sans endroit où répondre (une session hors de l'app Claude, ou Claude réduite), on visait le pigeon ;
+                # caché, il est garé dans la barre des tâches, et la ligne pointait « vers rien » (l'utilisateur, 5 octobre
+                # 2026, 20h47, sa capture). Pigeons cachés : pas de ligne, la carte du panneau suffit.
+                but = e.get("reponse")
+                if not but and self.reglages["afficher_pigeons"] and e["ident"] in self.pos:
+                    but = tuple(self.pos[e["ident"]])
                 if but and self.reglages["guidage"] == "lignes":
                     self.lignes.append((but[0], but[1], self.couleur_guide(e), None, False))   # jusqu'à la réponse
                 elif but and math.hypot(but[0] - cx, but[1] - cy) > 250:
@@ -3944,7 +4925,8 @@ class Volee:
         couleur(ap, "couleur_texte", "Texte")
         couleur(ap, "couleur_accent", "Accent")
         sous_titre(ap, "Bulles et étiquettes")
-        choix_en_ligne(ap, "bulles_couleurs", [("papier", "Papier (claires)"), ("theme", "Aux couleurs du thème")])
+        choix_en_ligne(ap, "bulles_couleurs", [("papier", "Papier (claires)"), ("theme", "Aux couleurs du thème"), ("sombre", "Sombres")])
+        case(ap, "bulle_cible", "Une bulle près de la cible (sinon, la consigne reste dans le panneau)")
         note(ap, "« Système » suit le thème clair ou sombre de Windows. « Ambre » reprend les couleurs d'Antigravity.")
         g = carte(0, "Général")
         sous_titre(g, "Langue")
@@ -3964,6 +4946,11 @@ class Volee:
         choix(gu, "infos_ecran", [("discret", "Discrètes (la ligne et l'encadré)"),
                                   ("detaille", "Détaillées (une étiquette : qui, quoi, depuis quand)"),
                                   ("complet", "Complètes (et le geste à faire, avec son raccourci)")])
+        sous_titre(gu, "La balise")
+        case(gu, "balise", "Une balise sur la ligne : où est exactement la cible (l'app, l'onglet, ce qui la couvre)")
+        sous_titre(gu, "Ce que dit la balise")
+        choix_en_ligne(gu, "balise_detail", [("complet", "Tout le chemin"), ("court", "L'app et l'élément")])
+        case(gu, "balise_respire", "Le halo de la balise respire lentement")
         sous_titre(gu, "Les flèches")
         case(gu, "fleche_creuse", "Flèches creuses (juste le contour)")
         glissiere(gu, "taille_fleche", "Taille des flèches (px)", 14, 44)
@@ -4010,6 +4997,7 @@ class Volee:
         choix(en, "encadres", [("toujours", "Actifs, toujours affichés"), ("approche", "Actifs quand ma souris approche"),
                                ("jamais", "Désactivés")])
         case(en, "encadres_montre", "Encadrer aussi l'endroit montré par une demande")
+        case(en, "encadres_travail", "Sans pigeons, encadrer où chaque IA travaille (avec son nom)")
         choix(en, "encadres_style", [("pointilles", "En pointillés"), ("plein", "En trait plein")])
         glissiere(en, "encadres_marge", "Taille autour de la cible (px)", -3, 12)
         glissiere(en, "encadres_arrondi", "Coins arrondis (px)", 0, 12)
@@ -4181,6 +5169,8 @@ class Volee:
         """Chaque seconde : les pigeons au premier plan, puis le panneau (reconstruit seulement s'il a changé)."""
         self.garder_devant()
         self.publier_boutons_panneau()
+        if int(time.time()) % 5 == 0:
+            self.suivre_ecrans()
         if self.reglages.get("theme") == "systeme" and int(time.time()) % 10 == 0:
             self.appliquer_apparence()                  # Windows a peut-être changé de thème
         try:
@@ -4188,6 +5178,48 @@ class Volee:
         except Exception:
             log.exception("panneau")
         self.racine.after(1000, self.rafraichir_panneau)
+
+    def suivre_ecrans(self):
+        """Les écrans peuvent changer pendant que les pigeons tournent (l'utilisateur, 3 octobre 2026, 23h44 : la Super
+        Résolution Virtuelle d'AMD a passé l'écran de gauche de 1920 x 1080 à 2560 x 1440). Ils étaient lus une fois, au
+        lancement : on les relit toutes les 5 s ; s'ils ont changé, les toiles des lignes se refont à la nouvelle taille,
+        et le guetteur (qui partage la même liste) situe ses cibles sur les nouveaux écrans."""
+        try:
+            ecrans = lire_ecrans()
+            if not ecrans or ecrans == self.ecrans:
+                return
+            log.info("les écrans ont changé : %s", [e["rect"] for e in ecrans])
+            self.ecrans[:] = ecrans
+            self.ecran_parc = next((e for e in ecrans if e["principal"]), ecrans[0])
+            for v in self.voiles:
+                v.detruire()
+            self.voiles, self.lignes_cle = [], None
+        except Exception:
+            log.exception("écrans")
+
+    def veiller_guetteur(self):
+        """Toutes les 5 s, le garde-fou du guetteur (5 octobre 2026 : mort sans un mot à l'ouverture de session, il a
+        laissé le registre figé plus de 40 h pendant que le panneau tournait). Figé depuis 30 s : sa pile va dans le
+        journal, pour savoir où il bloque. Mort, ou figé depuis 2 min : un nouveau guetteur prend sa place (au plus un
+        par 5 min) ; l'ancien, s'il se réveille, s'arrête sans rien écrire (actif est faux)."""
+        g, maintenant = self.guetteur, time.time()
+        try:
+            fige = maintenant - g.battement
+            if g.is_alive() and fige > GUETTEUR_FIGE_S and not g.signale:
+                g.signale = True
+                import traceback
+                cadre = sys._current_frames().get(g.ident)
+                pile = "".join(traceback.format_stack(cadre)) if cadre else "(pile introuvable)"
+                log.error("le guetteur est figé depuis %d s ; il en est là :\n%s", fige, pile)
+            if (not g.is_alive() or fige > GUETTEUR_RELANCE_S) and maintenant - self.t_relance_guetteur > 300:
+                log.error("le guetteur est %s : on en relance un", "figé" if g.is_alive() else "mort")
+                self.t_relance_guetteur = maintenant
+                g.actif = False
+                self.guetteur = Guetteur(self.partage, self.verrou, self.ecrans)
+                self.guetteur.start()
+        except Exception:
+            log.exception("garde-fou du guetteur")
+        self.racine.after(5000, self.veiller_guetteur)
 
     def lancer(self):
         self.racine.mainloop()

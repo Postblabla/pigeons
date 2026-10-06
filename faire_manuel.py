@@ -90,7 +90,18 @@ TEXTES = {
             ("--fenetre TITRE --element NOM", "un bouton, un lien ou une case d'une fenêtre, par une partie de son nom "
                                               "(lu par l'automatisation de Windows) ; avec --fenetre \"Pigeons\", un "
                                               "bouton du panneau (« Réglages », « Guide »...)"),
-            ("--point X Y", "un point de l'écran, en pixels physiques"),
+            ("--onglet TITRE", "avec --fenetre, l'onglet d'un navigateur où est la cible : s'il est caché, le guidage "
+                               "le montre d'abord (l'automatisation de Windows ne voit que la page de l'onglet affiché)"),
+            ("--page X Y L H, --echelle F", "un élément sans nom d'une page web : le rectangle de getBoundingClientRect() "
+                                            "en pixels CSS, et window.devicePixelRatio ; --element est préférable : "
+                                            "il suit le bouton s'il bouge"),
+            ("--point X Y", "un point de l'écran, en pixels physiques ; avec --dans TITRE, si une autre fenêtre couvre "
+                            "le point, le guidage ramène d'abord celle-là devant"),
+            ("--liste", "avec --fenetre (et --onglet) : les onglets et les éléments cliquables visibles, pour viser "
+                        "juste ; rien n'est montré"),
+            ("--sans-attendre", "ne pas attendre la réponse : par défaut, montre.py attend le guetteur (5 s au plus) "
+                                "et dit si la cible est trouvée, où (l'app, l'onglet, l'écran), et sinon pourquoi, "
+                                "avec les noms proches ; code de sortie 0 trouvée, 1 pas trouvée, 2 je ne sais pas"),
             ("--vers-fichier, --vers-fenetre, --vers-element, --vers-point", "l'arrivée d'un glisser"),
             ("--puis-fichier, --puis-fenetre, --puis-element, --puis-point, --puis-texte",
              "une deuxième étape (« clique ici, puis là ») : encadrés numérotés 1 et 2"),
@@ -144,7 +155,9 @@ TEXTES = {
                 "(`--minutes`) : la refaire en changeant de fichier.",
                 "**Demander avant d'écrire** : `python annonce.py --qui CHEMIN --session ag`. Code de sortie 0 : libre "
                 "(avec un « attention » si une autre IA travaille dans le même dossier) ; 1 : occupé (une autre IA a "
-                "écrit ce fichier depuis 10 min, ou travaille dessus) ; 2 : je ne sais pas (les pigeons ne tournent pas).",
+                "écrit ce fichier depuis 10 min, ou travaille dessus) ; 2 : je ne sais pas, et le message dit pourquoi : "
+                "les pigeons ne tournent pas, ou ils tournent mais leur registre est figé (leur guetteur ne fait plus "
+                "son tour ; ils le relancent seuls en 2 min). `montre.py` fait la même différence.",
                 "**Le conflit** : deux IA qui écrivent le même fichier à moins de 5 min font apparaître un bandeau en "
                 "haut du panneau.",
                 "**La limite** : seules les sessions Claude Code sont suivies sans rien faire ; les autres IA comptent "
@@ -333,7 +346,18 @@ TEXTES = {
             ("--fenetre TITLE --element NAME", "a button, link or box in a window, by part of its name (read by "
                                                "Windows UI Automation); with --fenetre \"Pigeons\", a panel button "
                                                "(“Réglages”, “Guide”...)"),
-            ("--point X Y", "a point on the screen, in physical pixels"),
+            ("--onglet TITLE", "with --fenetre, the browser tab holding the target: if it is hidden, the guidance "
+                               "shows the tab first (Windows UI Automation only sees the page of the displayed tab)"),
+            ("--page X Y W H, --echelle F", "an unnamed element of a web page: the getBoundingClientRect() rectangle in "
+                                            "CSS pixels, and window.devicePixelRatio; --element is better: it follows "
+                                            "the button if it moves"),
+            ("--point X Y", "a point on the screen, in physical pixels; with --dans TITLE, if another window covers "
+                            "the point, the guidance brings that one to the front first"),
+            ("--liste", "with --fenetre (and --onglet): the tabs and the visible clickable elements, to aim right; "
+                        "nothing is shown"),
+            ("--sans-attendre", "don't wait for the answer: by default montre.py waits for the watcher (5 s at most) "
+                                "and says whether the target is found, where (app, tab, screen), and if not why, with "
+                                "close names; exit code 0 found, 1 not found, 2 unknown"),
             ("--vers-fichier, --vers-fenetre, --vers-element, --vers-point", "the end of a drag"),
             ("--puis-fichier, --puis-fenetre, --puis-element, --puis-point, --puis-texte",
              "a second step (“click here, then there”): frames numbered 1 and 2"),
@@ -388,7 +412,9 @@ TEXTES = {
                 "(`--minutes`): announce again when changing files.",
                 "**Asking before writing**: `python annonce.py --qui PATH --session ag`. Exit code 0: free (with a "
                 "warning if another AI works in the same folder); 1: occupied (another AI wrote this file in the last "
-                "10 min, or works on it); 2: unknown (the pigeons are not running).",
+                "10 min, or works on it); 2: unknown, and the message says why: the pigeons are not running, or they "
+                "run but their registry is frozen (their watcher stopped its rounds; they restart it on their own "
+                "within 2 min). `montre.py` makes the same distinction.",
                 "**Conflicts**: two AIs writing the same file less than 5 min apart bring up a banner at the top of the "
                 "panel.",
                 "**The limit**: only Claude Code sessions are followed without doing anything; other AIs rely on good "
@@ -608,7 +634,7 @@ NOMS_DES_CHOIX = {
     "cible_cachee": "Quand une fenêtre cache l'icône où il travaille",
     "lignes_travail": "Ligne vers l'endroit exact où il travaille", "couleur_guides": "Couleur des guides",
     "bulles": "Bulles", "theme": "Thème", "theme_sombre": "Thème sombre", "contraste": "Contraste",
-    "bulles_couleurs": "Bulles et étiquettes",
+    "bulles_couleurs": "Bulles et étiquettes", "balise_detail": "Ce que dit la balise",
 }
 
 

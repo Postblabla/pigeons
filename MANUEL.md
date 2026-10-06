@@ -1,6 +1,6 @@
 # Pigeons : le manuel
 
-*Le système d'indication pour travailler avec des sessions d'IA · version du 2026-10-03*
+*Le système d'indication pour travailler avec des sessions d'IA · version du 2026-10-05*
 
 ## 1. À qui s'adresse ce manuel
 
@@ -33,6 +33,7 @@ Tout reste sur ton ordinateur : les pigeons lisent les journaux de Claude Code e
 - Un encadré épouse la cible. Avec plus d'infos à l'écran, une étiquette dit qui t'attend, pour quoi, et depuis quand.
 - Les pigeons eux-mêmes sont cachés par défaut (Réglages, carte Pigeons, pour les afficher). Affichés, le corps a la couleur de sa session ; un anneau qui respire : elle t'attend ; en pointillé : en pause.
 - Deux cibles liées (glisser un fichier dans un dossier, ou cliquer ici puis là) : une ligne fléchée va de la première à la seconde, leurs encadrés portent 1 et 2, et des étiquettes disent « prends ceci » et « dépose ici ».
+- La balise : sur la ligne, juste avant la cible, une petite étiquette dit où elle est exactement : l'app, l'onglet, le bouton (« Chrome › onglet « Gemini » › bouton « Envoyer » »). Si une autre fenêtre couvre la cible, une puce ambre dit laquelle, et l'étape 1 montre d'abord le bouton de l'app dans la barre des tâches ; un onglet caché se montre d'abord aussi. La balise ne couvre jamais la cible : elle recule le long de la ligne, et s'efface quand ta souris est tout près (Réglages, Guidage).
 - Les pigeonneaux sont les sous-agents d'une session.
 
 #### Les couleurs d'importance
@@ -107,7 +108,8 @@ Le bouton « Réglages » du panneau ouvre la fenêtre des réglages, dans le st
 | Fond | une couleur | #16171b | `couleur_fond` |
 | Texte | une couleur | #e9e9ec | `couleur_texte` |
 | Accent | une couleur | #8ab4ff | `couleur_accent` |
-| Bulles et étiquettes | Papier (claires) ; Aux couleurs du thème | Papier (claires) | `bulles_couleurs` |
+| Bulles et étiquettes | Papier (claires) ; Aux couleurs du thème ; Sombres | Papier (claires) | `bulles_couleurs` |
+| Une bulle près de la cible (sinon, la consigne reste dans le panneau) | oui ou non | non | `bulle_cible` |
 
 - « Système » suit le thème clair ou sombre de Windows. « Ambre » reprend les couleurs d'Antigravity.
 
@@ -129,6 +131,9 @@ Le bouton « Réglages » du panneau ouvre la fenêtre des réglages, dans le st
 | Guidage vers ce que tu as à faire | Des lignes pointillées de ma souris au but ; Des flèches autour de ma souris | Des flèches autour de ma souris | `guidage` |
 | Guider vers les sessions qui m'attendent | oui ou non | oui | `fleche_attente` |
 | Infos à l'écran | Discrètes (la ligne et l'encadré) ; Détaillées (une étiquette : qui, quoi, depuis quand) ; Complètes (et le geste à faire, avec son raccourci) | Discrètes (la ligne et l'encadré) | `infos_ecran` |
+| Une balise sur la ligne : où est exactement la cible (l'app, l'onglet, ce qui la couvre) | oui ou non | oui | `balise` |
+| Ce que dit la balise | Tout le chemin ; L'app et l'élément | Tout le chemin | `balise_detail` |
+| Le halo de la balise respire lentement | oui ou non | non | `balise_respire` |
 | Flèches creuses (juste le contour) | oui ou non | oui | `fleche_creuse` |
 | Taille des flèches (px) | de 14 à 44 | 23 | `taille_fleche` |
 
@@ -187,6 +192,7 @@ Le bouton « Réglages » du panneau ouvre la fenêtre des réglages, dans le st
 |---|---|---|---|
 | Encadrés | Actifs, toujours affichés ; Actifs quand ma souris approche ; Désactivés | Actifs, toujours affichés | `encadres` |
 | Encadrer aussi l'endroit montré par une demande | oui ou non | oui | `encadres_montre` |
+| Sans pigeons, encadrer où chaque IA travaille (avec son nom) | oui ou non | oui | `encadres_travail` |
 | Style | En pointillés ; En trait plein | En pointillés | `encadres_style` |
 | Taille autour de la cible (px) | de -3 à 12 | 0 | `encadres_marge` |
 | Coins arrondis (px) | de 0 à 12 | 6 | `encadres_arrondi` |
@@ -240,7 +246,11 @@ python "%USERPROFILE%\Desktop\Pigeons\montre.py" --texte "Clique sur Accepter" -
 | `--texte TEXTE` | la consigne, en une phrase |
 | `--fichier CHEMIN` | une icône du Bureau ou d'un dossier ouvert |
 | `--fenetre TITRE --element NOM` | un bouton, un lien ou une case d'une fenêtre, par une partie de son nom (lu par l'automatisation de Windows) ; avec --fenetre "Pigeons", un bouton du panneau (« Réglages », « Guide »...) |
-| `--point X Y` | un point de l'écran, en pixels physiques |
+| `--onglet TITRE` | avec --fenetre, l'onglet d'un navigateur où est la cible : s'il est caché, le guidage le montre d'abord (l'automatisation de Windows ne voit que la page de l'onglet affiché) |
+| `--page X Y L H, --echelle F` | un élément sans nom d'une page web : le rectangle de getBoundingClientRect() en pixels CSS, et window.devicePixelRatio ; --element est préférable : il suit le bouton s'il bouge |
+| `--point X Y` | un point de l'écran, en pixels physiques ; avec --dans TITRE, si une autre fenêtre couvre le point, le guidage ramène d'abord celle-là devant |
+| `--liste` | avec --fenetre (et --onglet) : les onglets et les éléments cliquables visibles, pour viser juste ; rien n'est montré |
+| `--sans-attendre` | ne pas attendre la réponse : par défaut, montre.py attend le guetteur (5 s au plus) et dit si la cible est trouvée, où (l'app, l'onglet, l'écran), et sinon pourquoi, avec les noms proches ; code de sortie 0 trouvée, 1 pas trouvée, 2 je ne sais pas |
 | `--vers-fichier, --vers-fenetre, --vers-element, --vers-point` | l'arrivée d'un glisser |
 | `--puis-fichier, --puis-fenetre, --puis-element, --puis-point, --puis-texte` | une deuxième étape (« clique ici, puis là ») : encadrés numérotés 1 et 2 |
 | `--importance haute\|normale\|basse` | haute par défaut |
@@ -273,12 +283,12 @@ Pour que deux IA n'écrivent pas le même fichier en même temps (l'utilisateur,
 
 - **Le registre** `activite.json` : les pigeons y écrivent toutes les 2 s qui travaille où (session, outil, fichier, dossier de projet, état, fichiers écrits depuis 10 min) et les conflits. Pour une IA qui a fait une demande, `demande.trouvee` dit si sa cible est trouvée à l'écran, et `demande.precision` pourquoi sinon. Les sessions Claude Code y sont seules, par leur journal.
 - **S'annoncer** (une autre IA) : `python annonce.py --session ag --titre "AG" --ia Antigravity --fichier CHEMIN --ecrit` ; ou `--dossier CHEMIN` ; `--fin` à la fin. L'annonce tient 10 min (`--minutes`) : la refaire en changeant de fichier.
-- **Demander avant d'écrire** : `python annonce.py --qui CHEMIN --session ag`. Code de sortie 0 : libre (avec un « attention » si une autre IA travaille dans le même dossier) ; 1 : occupé (une autre IA a écrit ce fichier depuis 10 min, ou travaille dessus) ; 2 : je ne sais pas (les pigeons ne tournent pas).
+- **Demander avant d'écrire** : `python annonce.py --qui CHEMIN --session ag`. Code de sortie 0 : libre (avec un « attention » si une autre IA travaille dans le même dossier) ; 1 : occupé (une autre IA a écrit ce fichier depuis 10 min, ou travaille dessus) ; 2 : je ne sais pas, et le message dit pourquoi : les pigeons ne tournent pas, ou ils tournent mais leur registre est figé (leur guetteur ne fait plus son tour ; ils le relancent seuls en 2 min). `montre.py` fait la même différence.
 - **Le conflit** : deux IA qui écrivent le même fichier à moins de 5 min font apparaître un bandeau en haut du panneau.
 
 ## 6. Comment ça marche dedans
 
-Tout tient dans `preuve_pigeons.py` (environ 4200 lignes), en trois parties qui se parlent par un état partagé.
+Tout tient dans `preuve_pigeons.py` (environ 5300 lignes), en trois parties qui se parlent par un état partagé.
 
 #### Le guetteur (classe Guetteur, un fil à part, un tour par seconde)
 

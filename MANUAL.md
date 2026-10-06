@@ -1,6 +1,6 @@
 # Pigeons: the manual
 
-*The guidance system for working with AI sessions · version of 2026-10-03*
+*The guidance system for working with AI sessions · version of 2026-10-05*
 
 ## 1. Who this manual is for
 
@@ -33,6 +33,7 @@ Everything stays on your computer: the pigeons read Claude Code's logs and send 
 - A frame hugs the target. With more on-screen info, a label says who is waiting, for what, and since when.
 - The pigeons themselves are hidden by default (Settings, Pigeons card, to show them). When shown, the body has its session's color; a breathing ring: it is waiting for you; dotted: paused.
 - Two linked targets (drag a file into a folder, or click here then there): an arrowed line goes from the first to the second, their frames show 1 and 2, and labels say “take this” and “drop here”.
+- The beacon: on the line, just before the target, a small label says exactly where it is: the app, the tab, the button (“Chrome › tab “Gemini” › button “Send””). If another window covers the target, an amber chip says which one, and step 1 shows the app's taskbar button first; a hidden tab is shown first too. The beacon never covers the target: it moves back along the line, and fades out when your mouse is close (Settings, Guidance).
 - Squabs are a session's sub-agents.
 
 #### Importance colors
@@ -107,7 +108,8 @@ The panel's “Settings” button opens the settings window, in the style of Cla
 | Background | a color | #16171b | `couleur_fond` |
 | Text | a color | #e9e9ec | `couleur_texte` |
 | Accent | a color | #8ab4ff | `couleur_accent` |
-| Bubbles and labels | Paper (light) ; Theme colors | Paper (light) | `bulles_couleurs` |
+| Bubbles and labels | Paper (light) ; Theme colors ; Dark | Paper (light) | `bulles_couleurs` |
+| A bubble near the target (otherwise, the instruction stays in the panel) | yes or no | no | `bulle_cible` |
 
 - “System” follows Windows' light or dark theme. “Amber” uses Antigravity's colors.
 
@@ -129,6 +131,9 @@ The panel's “Settings” button opens the settings window, in the style of Cla
 | Guidance to what you need to do | Dotted lines from my mouse to the target ; Arrows around my mouse | Arrows around my mouse | `guidage` |
 | Guide me to the sessions waiting for me | yes or no | yes | `fleche_attente` |
 | On-screen info | Discreet (the line and the frame) ; Detailed (a label: who, what, since when) ; Complete (plus the action to take, with its shortcut) | Discreet (the line and the frame) | `infos_ecran` |
+| A beacon on the line: exactly where the target is (the app, the tab, what covers it) | yes or no | yes | `balise` |
+| What the beacon says | The whole path ; The app and the item | The whole path | `balise_detail` |
+| The beacon's halo breathes slowly | yes or no | no | `balise_respire` |
 | Hollow arrows (outline only) | yes or no | yes | `fleche_creuse` |
 | Arrow size (px) | from 14 to 44 | 23 | `taille_fleche` |
 
@@ -187,6 +192,7 @@ The panel's “Settings” button opens the settings window, in the style of Cla
 |---|---|---|---|
 | Frames | On, always shown ; On when my mouse gets close ; Off | On, always shown | `encadres` |
 | Also frame the spot shown by a request | yes or no | yes | `encadres_montre` |
+| Without pigeons, frame where each AI works (with its name) | yes or no | yes | `encadres_travail` |
 | Style | Dotted ; Solid | Dotted | `encadres_style` |
 | Size around the target (px) | from -3 to 12 | 0 | `encadres_marge` |
 | Rounded corners (px) | from 0 to 12 | 6 | `encadres_arrondi` |
@@ -240,7 +246,11 @@ python "%USERPROFILE%\Desktop\Pigeons\montre.py" --texte "Click Accept" --fenetr
 | `--texte TEXT` | the instruction, in one sentence |
 | `--fichier PATH` | an icon on the Desktop or in an open folder |
 | `--fenetre TITLE --element NAME` | a button, link or box in a window, by part of its name (read by Windows UI Automation); with --fenetre "Pigeons", a panel button (“Réglages”, “Guide”...) |
-| `--point X Y` | a point on the screen, in physical pixels |
+| `--onglet TITLE` | with --fenetre, the browser tab holding the target: if it is hidden, the guidance shows the tab first (Windows UI Automation only sees the page of the displayed tab) |
+| `--page X Y W H, --echelle F` | an unnamed element of a web page: the getBoundingClientRect() rectangle in CSS pixels, and window.devicePixelRatio; --element is better: it follows the button if it moves |
+| `--point X Y` | a point on the screen, in physical pixels; with --dans TITLE, if another window covers the point, the guidance brings that one to the front first |
+| `--liste` | with --fenetre (and --onglet): the tabs and the visible clickable elements, to aim right; nothing is shown |
+| `--sans-attendre` | don't wait for the answer: by default montre.py waits for the watcher (5 s at most) and says whether the target is found, where (app, tab, screen), and if not why, with close names; exit code 0 found, 1 not found, 2 unknown |
 | `--vers-fichier, --vers-fenetre, --vers-element, --vers-point` | the end of a drag |
 | `--puis-fichier, --puis-fenetre, --puis-element, --puis-point, --puis-texte` | a second step (“click here, then there”): frames numbered 1 and 2 |
 | `--importance haute\|normale\|basse` | high (haute) by default |
@@ -273,12 +283,12 @@ So that two AIs don't write the same file at the same time (the user, October 3,
 
 - **The registry** `activite.json`: every 2 s the pigeons write who works where (session, tool, file, project folder, state, files written in the last 10 min) and the conflicts. For an AI that made a request, `demande.trouvee` says whether its target was found on screen, and `demande.precision` why not. Claude Code sessions are in it on their own, from their logs.
 - **Announcing** (another AI): `python annonce.py --session ag --titre "AG" --ia Antigravity --fichier PATH --ecrit`; or `--dossier PATH`; `--fin` at the end. The announcement lasts 10 min (`--minutes`): announce again when changing files.
-- **Asking before writing**: `python annonce.py --qui PATH --session ag`. Exit code 0: free (with a warning if another AI works in the same folder); 1: occupied (another AI wrote this file in the last 10 min, or works on it); 2: unknown (the pigeons are not running).
+- **Asking before writing**: `python annonce.py --qui PATH --session ag`. Exit code 0: free (with a warning if another AI works in the same folder); 1: occupied (another AI wrote this file in the last 10 min, or works on it); 2: unknown, and the message says why: the pigeons are not running, or they run but their registry is frozen (their watcher stopped its rounds; they restart it on their own within 2 min). `montre.py` makes the same distinction.
 - **Conflicts**: two AIs writing the same file less than 5 min apart bring up a banner at the top of the panel.
 
 ## 6. How it works inside
 
-Everything is in `preuve_pigeons.py` (about 4200 lines), in three parts that talk through a shared state.
+Everything is in `preuve_pigeons.py` (about 5300 lines), in three parts that talk through a shared state.
 
 #### The watcher (Guetteur class, its own thread, one round per second)
 
